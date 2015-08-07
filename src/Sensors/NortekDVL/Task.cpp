@@ -385,13 +385,13 @@ namespace Sensors
           return;
         }
 
-        readNumber(parts[7],  m_euler.psi);
-        readNumber(parts[9],  m_euler.theta);
-        readNumber(parts[11], m_euler.phi);
-        m_euler.psi   = Angles::normalizeRadian(Angles::radians(m_euler.psi));
-        m_euler.theta = Angles::normalizeRadian(Angles::radians(m_euler.theta));
-        m_euler.phi   = Angles::normalizeRadian(Angles::radians(m_euler.phi));
-        dispatch(m_euler);
+        // readNumber(parts[7],  m_euler.psi);
+        // readNumber(parts[9],  m_euler.theta);
+        // readNumber(parts[11], m_euler.phi);
+        // m_euler.psi   = Angles::normalizeRadian(Angles::radians(m_euler.psi));
+        // m_euler.theta = Angles::normalizeRadian(Angles::radians(m_euler.theta));
+        // m_euler.phi   = Angles::normalizeRadian(Angles::radians(m_euler.phi));
+        // dispatch(m_euler);
 
         readNumber(parts[13],  m_prs.value);
         m_prs.value *= 100; // dBar -> hPa
