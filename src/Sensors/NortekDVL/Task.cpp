@@ -47,9 +47,8 @@ namespace Sensors
     static const unsigned c_max_init_cmds = 14;
     //! Timeout for waitReply() function.
     static const float c_wait_reply_tout = 4.0;
-    static const unsigned c_pnorbt_fields = 10;
+    static const unsigned c_pnorbt7_fields = 9;
     static const unsigned c_pnors1_fields = 15;
-    static const unsigned c_pnori1_fields = 7;
     static const unsigned c_pnorc1_fields = 17;
     //! Power on delay.
     static const double c_pwr_on_delay = 5.0;
@@ -82,7 +81,6 @@ namespace Sensors
       IMC::EulerAngles m_euler;
       //! Task arguments.
       Arguments m_args;
-      double m_bdist, m_cell_len;
       std::string m_init_line;
       //! Reader thread.
       Reader* m_reader;
@@ -90,8 +88,6 @@ namespace Sensors
       Task(const std::string& name, Tasks::Context& ctx):
         Tasks::Task(name, ctx),
         m_handle(NULL),
-        m_bdist(0),
-        m_cell_len(0),
         m_reader(NULL)
       {
         // Define configuration parameters.
@@ -346,42 +342,37 @@ namespace Sensors
       void
       interpretSentence(std::vector<std::string>& parts)
       {
-        if (parts[0] == "PNORBT")
+        if (parts[0] == "PNORBT7") // bottom tracking
         {
-          interpretPNORBT(parts);
+          interpretPNORBT7(parts);
         }
         else if (parts[0] == "PNORS1")
         {
           interpretPNORS1(parts);
         }
-        else if (parts[0] == "PNORI1")
-        {
-          interpretPNORI1(parts);
-        }
-        else if (parts[0] == "PNORC1")
-        {
-          interpretPNORC1(parts);
-        }
       }
 
       void
-      interpretPNORBT(const std::vector<std::string>& parts)
+      interpretPNORBT7(const std::vector<std::string>& parts)
       {
-        if (parts.size() < c_pnorbt_fields)
+        if (parts.size() != c_pnorbt7_fields)
         {
-          war(DTR("invalid PNORBT sentence"));
+          war(DTR("invalid PNORBT7 sentence"));
           return;
         }
 
-        readNumber(parts[8], m_bdist);
+        readNumber(parts[2], m_gvel.x);
+        readNumber(parts[3], m_gvel.y);
+        readNumber(parts[4], m_gvel.z);
+        dispatch(m_gvel);
       }
 
       void
       interpretPNORS1(const std::vector<std::string>& parts)
       {
-        if (parts.size() < c_pnors1_fields)
+        if (parts.size() != c_pnors1_fields)
         {
-          war(DTR("invalid PNORS sentence"));
+          war(DTR("invalid PNORS1 sentence"));
           return;
         }
 
@@ -399,41 +390,6 @@ namespace Sensors
 
         readNumber(parts[15],  m_temp.value);
         dispatch(m_temp);
-      }
-
-      void
-      interpretPNORI1(const std::vector<std::string>& parts)
-      {
-        if (parts.size() < c_pnori1_fields)
-        {
-          war(DTR("invalid PNORI1 sentence"));
-          return;
-        }
-
-        readNumber(parts[6], m_cell_len);
-      }
-
-      void
-      interpretPNORC1(const std::vector<std::string>& parts)
-      {
-        if (parts.size() < c_pnorc1_fields)
-        {
-          war(DTR("invalid PNORC1 sentence"));
-          return;
-        }
-
-        double pos;
-        readNumber(parts[4], pos);
-
-        if (pos <= m_bdist && pos >= m_bdist - m_cell_len)
-        {
-          readNumber(parts[9],  m_gvel.x);
-          readNumber(parts[10], m_gvel.y);
-          readNumber(parts[11], m_gvel.z);
-          dispatch(m_gvel);
-
-          inf("vel %f, %f, %f", m_gvel.x, m_gvel.y, m_gvel.z);
-        }
       }
 
       void
