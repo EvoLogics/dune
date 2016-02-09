@@ -43,15 +43,9 @@ namespace Sensors
   {
     using DUNE_NAMESPACES;
 
-    //! Maximum number of initialization commands.
-    static const unsigned c_max_init_cmds = 14;
-    //! Timeout for waitReply() function.
-    static const float c_wait_reply_tout = 4.0;
-    static const unsigned c_pnorbt7_fields = 9;
-    static const unsigned c_pnors1_fields = 15;
-    static const unsigned c_pnorc1_fields = 17;
-    //! Power on delay.
+    static const unsigned c_pnorbt7_fields = 10;
     static const double c_pwr_on_delay = 5.0;
+    static const double c_init_tout = 5.0;
 
     struct Arguments
     {
@@ -59,14 +53,8 @@ namespace Sensors
       std::string uart_dev;
       //! Serial port baud rate.
       unsigned uart_baud;
-      //! Order of sentences.
-      std::vector<std::string> stn_order;
       //! Input timeout in seconds.
       float inp_tout;
-      //! Initialization commands.
-      std::string init_cmds[c_max_init_cmds];
-      //! Initialization replies.
-      std::string init_rpls[c_max_init_cmds];
       //! Power channels.
       std::vector<std::string> pwr_channels;
     };
@@ -101,28 +89,13 @@ namespace Sensors
 
         param("Input Timeout", m_args.inp_tout)
         .units(Units::Second)
-        .defaultValue("4.0")
+        .defaultValue("5.0")
         .minimumValue("0.0")
         .description("Input timeout");
 
         param("Power Channel - Names", m_args.pwr_channels)
         .defaultValue("")
         .description("Device's power channels");
-
-        param("Sentence Order", m_args.stn_order)
-        .defaultValue("")
-        .description("Sentence order");
-
-        for (unsigned i = 0; i < c_max_init_cmds; ++i)
-        {
-          std::string cmd_label = String::str("Initialization String %u - Command", i);
-          param(cmd_label, m_args.init_cmds[i])
-          .defaultValue("");
-
-          std::string rpl_label = String::str("Initialization String %u - Reply", i);
-          param(rpl_label, m_args.init_rpls[i])
-          .defaultValue("");
-        }
 
         m_euler.setSourceEntity(getEntityId());
         m_prs.setSourceEntity(getEntityId());
@@ -196,24 +169,16 @@ namespace Sensors
       void
       onResourceInitialization(void)
       {
-        for (unsigned i = 0; i < c_max_init_cmds; ++i)
+        Counter<float> counter(c_init_tout);
+        while (!stopping() && !counter.overflow())
         {
-          if (m_args.init_cmds[i].empty())
-            continue;
-
-          std::string cmd = String::unescape(m_args.init_cmds[i]);
-          m_handle->writeString(cmd.c_str());
-
-          if (!m_args.init_rpls[i].empty())
-          {
-            std::string rpl = String::unescape(m_args.init_rpls[i]);
-            if (!waitInitReply(rpl))
-            {
-              err("%s: %s", DTR("no reply to command"), m_args.init_cmds[i].c_str());
-              throw std::runtime_error(DTR("failed to setup device"));
-            }
-          }
+          waitForMessages(counter.getRemaining());
+          if (m_reader->getState() == 2)
+            break;
         }
+
+        if (counter.overflow())
+          throw std::runtime_error(DTR("failed to setup device"));
 
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
       }
@@ -227,12 +192,7 @@ namespace Sensors
         if (msg->getDestinationEntity() != getEntityId())
           return;
 
-        inf("inp: %s", sanitize(msg->value).c_str());
-
-        // if (getEntityState() == IMC::EntityState::ESTA_BOOT)
-        //   m_init_line = msg->value;
-        // else
-          processSentence(msg->value);
+        processSentence(msg->value);
       }
 
       void
@@ -246,26 +206,6 @@ namespace Sensors
 
         if (msg->type == IMC::IoEvent::IOV_TYPE_INPUT_ERROR)
           throw RestartNeeded(msg->error, 5);
-      }
-
-      //! Wait reply to initialization command.
-      //! @param[in] stn string to compare.
-      //! @return true on successful match, false otherwise.
-      bool
-      waitInitReply(const std::string& stn)
-      {
-        Counter<float> counter(c_wait_reply_tout);
-        while (!stopping() && !counter.overflow())
-        {
-          waitForMessages(counter.getRemaining());
-          if (m_init_line == stn)
-          {
-            m_init_line.clear();
-            return true;
-          }
-        }
-
-        return false;
       }
 
       //! Read decimal from input string.
@@ -340,20 +280,7 @@ namespace Sensors
       //! Interpret given sentence.
       //! @param[in] parts vector of strings from sentence.
       void
-      interpretSentence(std::vector<std::string>& parts)
-      {
-        if (parts[0] == "PNORBT7") // bottom tracking
-        {
-          interpretPNORBT7(parts);
-        }
-        else if (parts[0] == "PNORS1")
-        {
-          interpretPNORS1(parts);
-        }
-      }
-
-      void
-      interpretPNORBT7(const std::vector<std::string>& parts)
+      interpretSentence(const std::vector<std::string>& parts)
       {
         if (parts.size() != c_pnorbt7_fields)
         {
@@ -366,31 +293,6 @@ namespace Sensors
         readNumber(parts[4], m_gvel.z);
         dispatch(m_gvel);
         inf("BT7 %.2f, %.2f, %.2f", m_gvel.x, m_gvel.y, m_gvel.z);
-      }
-
-      void
-      interpretPNORS1(const std::vector<std::string>& parts)
-      {
-        if (parts.size() != c_pnors1_fields)
-        {
-          war(DTR("invalid PNORS1 sentence"));
-          return;
-        }
-
-        // readNumber(parts[7],  m_euler.psi);
-        // readNumber(parts[9],  m_euler.theta);
-        // readNumber(parts[11], m_euler.phi);
-        // m_euler.psi   = Angles::normalizeRadian(Angles::radians(m_euler.psi));
-        // m_euler.theta = Angles::normalizeRadian(Angles::radians(m_euler.theta));
-        // m_euler.phi   = Angles::normalizeRadian(Angles::radians(m_euler.phi));
-        // dispatch(m_euler);
-
-        readNumber(parts[13],  m_prs.value);
-        m_prs.value *= 100; // dBar -> hPa
-        dispatch(m_prs);
-
-        readNumber(parts[15],  m_temp.value);
-        dispatch(m_temp);
       }
 
       void

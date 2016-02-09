@@ -54,6 +54,12 @@ namespace Sensors
       {
       }
 
+      uint8_t
+      getState(void)
+      {
+        return m_state;
+      }
+
     private:
       //! Parent task.
       Tasks::Task* m_task;
