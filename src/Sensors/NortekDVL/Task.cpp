@@ -57,6 +57,8 @@ namespace Sensors
       float inp_tout;
       //! Power channels.
       std::vector<std::string> pwr_channels;
+
+      Reader::NortekParam params;
     };
 
     struct Task: public Tasks::Task
@@ -97,6 +99,43 @@ namespace Sensors
         .defaultValue("")
         .description("Device's power channels");
 
+        param("Username", m_args.params.username)
+        .defaultValue("nortek")
+        .description("User name to athenticate command interface");
+
+        param("Password", m_args.params.password)
+        .defaultValue("")
+        .description("Password to athenticate command interface");
+
+        param("Input Rate", m_args.params.rate)
+        .defaultValue("4.0")
+        .minimumValue("0.0")
+        .description("Input rate");
+
+        param("Sound Velocity", m_args.params.rate)
+        .defaultValue("0.0")
+        .description("Sound velocity");
+
+        param("Sound Velocity", m_args.params.sndvel)
+        .defaultValue("0.0")
+        .description("Sound velocity");
+
+        param("Salinity", m_args.params.salinity)
+        .defaultValue("0.0")
+        .description("Salinity");
+
+        param("Bottom-Track Range", m_args.params.bt_range)
+        .defaultValue("30.0")
+        .description("Bottom-track range");
+
+        param("Velocity Range", m_args.params.v_range)
+        .defaultValue("5.0")
+        .description("Velocity range");
+
+        param("Power Level", m_args.params.pwr_level)
+        .defaultValue("-20.0")
+        .description("Power level");
+
         m_euler.setSourceEntity(getEntityId());
         m_prs.setSourceEntity(getEntityId());
         m_temp.setSourceEntity(getEntityId());
@@ -129,8 +168,7 @@ namespace Sensors
           if (!openSocket())
             m_handle = new SerialPort(m_args.uart_dev, m_args.uart_baud);
 
-          Reader::NortekParam parm = { "nortek", "", 4, 0, 35, 30, 5, -20 };
-          m_reader = new Reader(this, m_handle, parm);
+          m_reader = new Reader(this, m_handle, m_args.params);
           m_reader->start();
         }
         catch (...)
