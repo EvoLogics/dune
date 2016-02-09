@@ -146,6 +146,23 @@ namespace Sensors
       }
 
       void
+      onUpdateParameters(void)
+      {
+        if (m_reader)
+        {
+          if (paramChanged(m_args.params.username) ||
+              paramChanged(m_args.params.password) ||
+              paramChanged(m_args.params.rate) ||
+              paramChanged(m_args.params.sndvel) ||
+              paramChanged(m_args.params.salinity) ||
+              paramChanged(m_args.params.bt_range) ||
+              paramChanged(m_args.params.v_range) ||
+              paramChanged(m_args.params.pwr_level))
+            m_reader->reconfigure(m_args.params);
+        }
+      }
+
+      void
       onResourceAcquisition(void)
       {
         if (m_args.pwr_channels.size() > 0)
