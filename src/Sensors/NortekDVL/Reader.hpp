@@ -44,20 +44,39 @@ namespace Sensors
     class Reader: public Concurrency::Thread
     {
     public:
+      struct NortekParam
+      {
+        std::string username, password;
+        double rate, sndvel, salinity;
+        double bt_range, v_range, pwr_level;
+      };
+
       //! Constructor.
       //! @param[in] task parent task.
       //! @param[in] handle I/O handle.
-      Reader(Tasks::Task* task, IO::Handle* handle):
+      Reader(Tasks::Task* task, IO::Handle* handle, NortekParam &param):
         m_task(task),
         m_handle(handle),
-        m_state(0)
+        m_state(0),
+        m_param(param)
       {
       }
 
       uint8_t
       getState(void)
       {
+        ScopedMutex m(m_closed_mutex);
         return m_state;
+      }
+
+      void
+      reconfigure(NortekParam &param)
+      {
+        ScopedMutex m(m_closed_mutex);
+
+        m_handle->writeString(c_control_seq);
+        m_state = 1; // CONF
+        m_param = param;
       }
 
     private:
@@ -69,8 +88,10 @@ namespace Sensors
       char m_buffer[c_read_buffer_size];
       //! State
       uint8_t m_state, m_conf_line;
+      NortekParam m_param;
       //! Current line.
       std::string m_line;
+      Mutex m_closed_mutex;
 
       void
       dispatch(IMC::Message& msg)
@@ -83,14 +104,18 @@ namespace Sensors
       void
       auth(void)
       {
+        ScopedMutex m(m_closed_mutex);
+
         if (m_line.rfind("Username: ") != std::string::npos)
         {
           m_line.clear();
-          m_handle->writeString("nortek\n");
+          m_handle->writeString(m_param.username.c_str());
+          m_handle->writeString("\n");
         }
         else if (m_line.rfind("Password: ") != std::string::npos)
         {
           m_line.clear();
+          m_handle->writeString(m_param.password.c_str());
           m_handle->writeString("\n");
         }
         else if (m_line.rfind("Command Interface\r\n") != std::string::npos) {
@@ -108,6 +133,7 @@ namespace Sensors
       void
       conf(void)
       {
+        ScopedMutex m(m_closed_mutex);
         std::string str;
 
         if (m_line.rfind("OK\r\n") != std::string::npos)
@@ -120,12 +146,14 @@ namespace Sensors
               break;
 
             case 1:
-              str = String::str("SETDVL,0,\"OFF\",\"INTSR\",%.1f,\"\",0.%.1f,%.1f\r\n", 4., 0., 35.);
+              str = String::str("SETDVL,0,\"OFF\",\"INTSR\",%.1f,\"\",%.1f,%.1f\r\n",
+                      m_param.rate, m_param.sndvel, m_param.salinity);
               m_handle->writeString(str.c_str());
               break;
 
             case 2:
-              str = String::str("SETBT,%.2f,%.2f,4,0,307,%.1f,\"XYZ\"\r\n", 30., 5., -20.);
+              str = String::str("SETBT,%.2f,%.2f,4,0,307,%.1f,\"XYZ\"\r\n",
+                      m_param.bt_range, m_param.v_range, m_param.pwr_level);
               m_handle->writeString(str.c_str());
               break;
 

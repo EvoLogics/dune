@@ -129,7 +129,8 @@ namespace Sensors
           if (!openSocket())
             m_handle = new SerialPort(m_args.uart_dev, m_args.uart_baud);
 
-          m_reader = new Reader(this, m_handle);
+          Reader::NortekParam parm = { "nortek", "", 4, 0, 35, 30, 5, -20 };
+          m_reader = new Reader(this, m_handle, parm);
           m_reader->start();
         }
         catch (...)
