@@ -39,8 +39,7 @@ namespace Sensors
 
     //! Read buffer size.
     static const size_t c_read_buffer_size = 4096;
-    //! Line termination character.
-    static const char c_line_term = '\n';
+    static const char *c_control_seq = "K1W%!Q\r\n";
 
     class Reader: public Concurrency::Thread
     {
@@ -50,9 +49,9 @@ namespace Sensors
       //! @param[in] handle I/O handle.
       Reader(Tasks::Task* task, IO::Handle* handle):
         m_task(task),
-        m_handle(handle)
+        m_handle(handle),
+        m_state(0)
       {
-        m_buffer.resize(c_read_buffer_size);
       }
 
     private:
@@ -61,7 +60,9 @@ namespace Sensors
       //! I/O handle.
       IO::Handle* m_handle;
       //! Internal read buffer.
-      std::vector<char> m_buffer;
+      char m_buffer[c_read_buffer_size];
+      //! State
+      uint8_t m_state, m_conf_line;
       //! Current line.
       std::string m_line;
 
@@ -74,25 +75,123 @@ namespace Sensors
       }
 
       void
+      auth(void)
+      {
+        if (m_line.rfind("Username: ") != std::string::npos)
+        {
+          m_line.clear();
+          m_handle->writeString("nortek\n");
+        }
+        else if (m_line.rfind("Password: ") != std::string::npos)
+        {
+          m_line.clear();
+          m_handle->writeString("\n");
+        }
+        else if (m_line.rfind("Command Interface\r\n") != std::string::npos) {
+          m_line.clear();
+          m_conf_line = 0;
+          m_handle->writeString(c_control_seq);
+          m_state = 1; // CONF
+        }
+        else if (m_line.rfind("Login failed") != std::string::npos)
+        {
+          throw std::runtime_error("Login failed");
+        }
+      }
+
+      void
+      conf(void)
+      {
+        std::string str;
+
+        if (m_line.rfind("OK\r\n") != std::string::npos)
+        {
+          m_line.clear();
+          switch (m_conf_line++)
+          {
+            case 0:
+              m_handle->writeString("MC\r\n");
+              break;
+
+            case 1:
+              str = String::str("SETDVL,0,\"OFF\",\"INTSR\",%.1f,\"\",0.%.1f,%.1f\r\n", 4., 0., 35.);
+              m_handle->writeString(str.c_str());
+              break;
+
+            case 2:
+              str = String::str("SETBT,%.2f,%.2f,4,0,307,%.1f,\"XYZ\"\r\n", 30., 5., -20.);
+              m_handle->writeString(str.c_str());
+              break;
+
+            case 3:
+              m_handle->writeString("START\r\n");
+              break;
+
+            default:
+              m_state = 2; // CAPTURE
+          }
+        }
+        else if (m_line.rfind("ERROR\r\n") != std::string::npos)
+        {
+          m_line.clear();
+          m_handle->writeString("GETERROR\r\n");
+          m_state = 3; // ERROR
+        }
+      }
+
+      void
       read(void)
       {
         if (!Poll::poll(*m_handle, 1.0))
           return;
 
-        size_t rv = m_handle->read(&m_buffer[0], m_buffer.size());
+        size_t pos;
+        size_t rv = m_handle->read(m_buffer, c_read_buffer_size);
         if (rv == 0)
           throw std::runtime_error(DTR("invalid read size"));
 
-        for (size_t i = 0; i < rv; ++i)
+        switch (m_state)
         {
-          m_line.push_back(m_buffer[i]);
-          if (m_buffer[i] == c_line_term)
-          {
-            IMC::DevDataText line;
-            line.value = m_line;
-            dispatch(line);
-            m_line.clear();
-          }
+          case 0: // INIT
+            m_line.append(m_buffer, rv);
+            if (m_line.size() > c_read_buffer_size)
+              m_line.erase(0, m_line.size() - c_read_buffer_size);
+
+            auth();
+            break;
+
+          case 1: // CONF
+            m_line.append(m_buffer, rv);
+            if (m_line.size() > c_read_buffer_size)
+              m_line.erase(0, m_line.size() - c_read_buffer_size);
+
+            conf();
+            break;
+
+          case 2: // CAPTURE
+            m_line.append(m_buffer, rv);
+            if (m_line.size() > c_read_buffer_size)
+              m_line.erase(0, m_line.size() - c_read_buffer_size);
+
+            while ((pos = m_line.find('\n')) != std::string::npos)
+            {
+              IMC::DevDataText line;
+              line.value = m_line.substr(0, pos - 1);
+              m_line.erase(0, pos + 1);
+              dispatch(line);
+            }
+            break;
+
+          case 3: // ERROR
+          default:
+            m_line.append(m_buffer, rv);
+            if (m_line.size() > c_read_buffer_size)
+              m_line.erase(0, m_line.size() - c_read_buffer_size);
+
+            if ((pos = m_line.find('\n')) != std::string::npos)
+              throw std::runtime_error(m_line.substr(0, pos - 1));
+
+            break;
         }
       }
 

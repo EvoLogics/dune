@@ -227,7 +227,7 @@ namespace Sensors
         if (msg->getDestinationEntity() != getEntityId())
           return;
 
-        spew("inp: %s", sanitize(msg->value).c_str());
+        inf("inp: %s", sanitize(msg->value).c_str());
 
         // if (getEntityState() == IMC::EntityState::ESTA_BOOT)
         //   m_init_line = msg->value;
@@ -365,6 +365,7 @@ namespace Sensors
         readNumber(parts[3], m_gvel.y);
         readNumber(parts[4], m_gvel.z);
         dispatch(m_gvel);
+        inf("BT7 %.2f, %.2f, %.2f", m_gvel.x, m_gvel.y, m_gvel.z);
       }
 
       void
