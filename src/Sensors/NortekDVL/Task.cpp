@@ -271,8 +271,8 @@ namespace Sensors
             processBottomTrack(data, len);
             break;
 
-          case 0x15:
-            processCurrentProfile(data, len);
+          case 0x16:
+            processAverageData(data, len);
             break;
 
           default:
@@ -310,9 +310,16 @@ namespace Sensors
       }
 
       void
-      processCurrentProfile(const char *data, size_t len)
+      processAverageData(const char *data, size_t len)
       {
-        (void)data;
+        uint16_t yaw;
+        int16_t roll, pitch;
+        std::memcpy(&roll,  data + HDR_SIZE + 24, sizeof(uint16_t));
+        std::memcpy(&pitch, data + HDR_SIZE + 26, sizeof(int16_t));
+        std::memcpy(&yaw,   data + HDR_SIZE + 28, sizeof(int16_t));
+
+        inf("rpy: (%.2f , %.2f, %.2f)",
+                (float)roll * 0.01, (float)pitch * 0.01, (float)yaw * 0.01);
         (void)len;
       }
 
