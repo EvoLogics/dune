@@ -307,9 +307,6 @@ namespace Sensors
       void
       processFrame(void)
       {
-        if (m_cache[2] == 0x17) // ID == Bottom Track Data Record
-          return;
-
         IMC::DevDataBinary data;
         data.value.assign(m_cache, m_cache + m_cached);
         dispatch(data);

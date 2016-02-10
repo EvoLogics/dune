@@ -111,10 +111,6 @@ namespace Sensors
         .minimumValue("0.0")
         .description("Input rate");
 
-        param("Sound Velocity", m_args.params.rate)
-        .defaultValue("0.0")
-        .description("Sound velocity");
-
         param("Sound Velocity", m_args.params.sndvel)
         .defaultValue("0.0")
         .description("Sound velocity");
@@ -269,6 +265,24 @@ namespace Sensors
       void
       processFrame(const char *data, size_t len)
       {
+        switch (data[2])
+        {
+          case 0x1B:
+            processBottomTrack(data, len);
+            break;
+
+          case 0x15:
+            processCurrentProfile(data, len);
+            break;
+
+          default:
+            inf("not supported: %" PRIx8, data[2]);
+        }
+      }
+
+      void
+      processBottomTrack(const char *data, size_t len)
+      {
         float vx, vy, vz;
         std::memcpy(&vx, data + HDR_SIZE + 132, sizeof(float));
         std::memcpy(&vy, data + HDR_SIZE + 136, sizeof(float));
@@ -278,8 +292,27 @@ namespace Sensors
         m_gvel.z = vz;
         dispatch(m_gvel);
 
-        inf("BT7 %.2f, %.2f, %.2f", m_gvel.x, m_gvel.y, m_gvel.z);
+        float prs;
+        std::memcpy(&prs, data + HDR_SIZE + 32, sizeof(float));
+        m_prs.value = prs * 1000;
+        dispatch(m_prs);
 
+        float temp;
+        std::memcpy(&temp, data + HDR_SIZE + 28, sizeof(float));
+        m_temp.value = temp;
+        dispatch(m_temp);
+
+        inf("vel: (%.2f, %.2f, %.2f), prs: %f, temp: %f",
+                m_gvel.x, m_gvel.y, m_gvel.z,
+                prs * 10, temp);
+
+        (void)len;
+      }
+
+      void
+      processCurrentProfile(const char *data, size_t len)
+      {
+        (void)data;
         (void)len;
       }
 
