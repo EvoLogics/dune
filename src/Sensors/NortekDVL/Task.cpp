@@ -43,9 +43,8 @@ namespace Sensors
   {
     using DUNE_NAMESPACES;
 
-    static const unsigned c_pnorbt7_fields = 10;
     static const double c_pwr_on_delay = 5.0;
-    static const double c_init_tout = 5.0;
+    static const double c_init_tout = 10.0;
 
     struct Arguments
     {
@@ -141,7 +140,7 @@ namespace Sensors
         m_temp.setSourceEntity(getEntityId());
         m_gvel.setSourceEntity(getEntityId());
 
-        bind<IMC::DevDataText>(this);
+        bind<IMC::DevDataBinary>(this);
         bind<IMC::IoEvent>(this);
       }
 
@@ -225,22 +224,25 @@ namespace Sensors
       void
       onResourceInitialization(void)
       {
+        bool ok = false;
         Counter<float> counter(c_init_tout);
         while (!stopping() && !counter.overflow())
         {
           waitForMessages(counter.getRemaining());
-          if (m_reader->getState() == 2)
+          if (m_reader->getState() >= MSTA_SEEK_HDR) {
+            ok = true;
             break;
+          }
         }
 
-        if (counter.overflow())
+        if (!ok)
           throw std::runtime_error(DTR("failed to setup device"));
 
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
       }
 
       void
-      consume(const IMC::DevDataText* msg)
+      consume(const IMC::DevDataBinary* msg)
       {
         if (msg->getDestination() != getSystemId())
           return;
@@ -248,7 +250,7 @@ namespace Sensors
         if (msg->getDestinationEntity() != getEntityId())
           return;
 
-        processSentence(msg->value);
+        processFrame(&msg->value[0], msg->value.size());
       }
 
       void
@@ -264,91 +266,21 @@ namespace Sensors
           throw RestartNeeded(msg->error, 5);
       }
 
-      //! Read decimal from input string.
-      //! @param[in] str input string.
-      //! @param[out] dst decimal.
-      //! @return true if successful, false otherwise.
-      template <typename T>
-      bool
-      readDecimal(const std::string& str, T& dst)
-      {
-        unsigned idx = 0;
-        while (str[idx] == '0')
-          ++idx;
-
-        return castLexical(std::string(str, idx), dst);
-      }
-
-      //! Read number from input string.
-      //! @param[in] str input string.
-      //! @param[out] dst number.
-      //! @return true if successful, false otherwise.
-      template <typename T>
-      bool
-      readNumber(const std::string& str, T& dst)
-      {
-        return castLexical(str, dst);
-      }
-
-      //! Process sentence.
-      //! @param[in] line line.
       void
-      processSentence(const std::string& line)
+      processFrame(const char *data, size_t len)
       {
-        // Discard leading noise.
-        size_t sidx = 0;
-        for (sidx = 0; sidx < line.size(); ++sidx)
-        {
-          if (line[sidx] == '$')
-            break;
-        }
-
-        // Discard trailing noise.
-        size_t eidx = 0;
-        for (eidx = line.size() - 1; eidx > sidx; --eidx)
-        {
-          if (line[eidx] == '*')
-            break;
-        }
-
-        if (sidx >= eidx)
-          return;
-
-        // Compute checksum.
-        uint8_t ccsum = 0;
-        for (size_t i = sidx + 1; i < eidx; ++i)
-          ccsum ^= line[i];
-
-        // Validate checksum.
-        unsigned rcsum = 0;
-        if (std::sscanf(&line[0] + eidx + 1, "%02X", &rcsum) != 1)
-        {
-          return;
-        }
-
-        // Split sentence
-        std::vector<std::string> parts;
-        String::split(line.substr(sidx + 1, eidx - sidx - 1), ",", parts);
-
-        interpretSentence(parts);
-      }
-
-      //! Interpret given sentence.
-      //! @param[in] parts vector of strings from sentence.
-      void
-      interpretSentence(const std::vector<std::string>& parts)
-      {
-        if (parts.size() != c_pnorbt7_fields)
-        {
-          war(DTR("invalid PNORBT7 sentence"));
-          return;
-        }
-
-        readNumber(parts[2], m_gvel.x);
-        readNumber(parts[3], m_gvel.y);
-        readNumber(parts[4], m_gvel.z);
+        float vx, vy, vz;
+        std::memcpy(&vx, data + HDR_SIZE + 132, sizeof(float));
+        std::memcpy(&vy, data + HDR_SIZE + 136, sizeof(float));
+        std::memcpy(&vz, data + HDR_SIZE + 140, sizeof(float));
+        m_gvel.x = vx;
+        m_gvel.y = vy;
+        m_gvel.z = vz;
         dispatch(m_gvel);
+
         inf("BT7 %.2f, %.2f, %.2f", m_gvel.x, m_gvel.y, m_gvel.z);
+
+        (void)len;
       }
 
       void

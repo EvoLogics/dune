@@ -30,6 +30,19 @@
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
+#include <cstring>
+#include <inttypes.h>
+#include <algorithm>
+
+#define MSTA_INIT               0
+#define MSTA_CONF               1
+#define MSTA_ERROR              2
+#define MSTA_SEEK_HDR           3
+#define MSTA_SEEK_CACHED_HDR    4
+#define MSTA_CACHE_HDR          5
+#define MSTA_CACHE_DATA         6
+
+#define HDR_SIZE 10
 
 namespace Sensors
 {
@@ -57,7 +70,7 @@ namespace Sensors
       Reader(Tasks::Task* task, IO::Handle* handle, NortekParam &param):
         m_task(task),
         m_handle(handle),
-        m_state(0),
+        m_state(MSTA_INIT),
         m_param(param)
       {
       }
@@ -75,8 +88,9 @@ namespace Sensors
         ScopedMutex m(m_closed_mutex);
 
         m_handle->writeString(c_control_seq);
-        m_state = 1; // CONF
+        m_state = MSTA_CONF;
         m_param = param;
+        m_conf_line = 0;
       }
 
     private:
@@ -86,8 +100,10 @@ namespace Sensors
       IO::Handle* m_handle;
       //! Internal read buffer.
       char m_buffer[c_read_buffer_size];
+      uint8_t m_cache[c_read_buffer_size];
       //! State
       uint8_t m_state, m_conf_line;
+      size_t m_cached;
       NortekParam m_param;
       //! Current line.
       std::string m_line;
@@ -122,7 +138,7 @@ namespace Sensors
           m_line.clear();
           m_conf_line = 0;
           m_handle->writeString(c_control_seq);
-          m_state = 1; // CONF
+          m_state = MSTA_CONF;
         }
         else if (m_line.rfind("Login failed") != std::string::npos)
         {
@@ -152,7 +168,7 @@ namespace Sensors
               break;
 
             case 2:
-              str = String::str("SETBT,%.2f,%.2f,4,0,307,%.1f,\"XYZ\"\r\n",
+              str = String::str("SETBT,%.2f,%.2f,4,0,21,%.1f,\"XYZ\"\r\n",
                       m_param.bt_range, m_param.v_range, m_param.pwr_level);
               m_handle->writeString(str.c_str());
               break;
@@ -162,14 +178,14 @@ namespace Sensors
               break;
 
             default:
-              m_state = 2; // CAPTURE
+              m_state = MSTA_SEEK_HDR;
           }
         }
         else if (m_line.rfind("ERROR\r\n") != std::string::npos)
         {
           m_line.clear();
           m_handle->writeString("GETERROR\r\n");
-          m_state = 3; // ERROR
+          m_state = MSTA_ERROR;
         }
       }
 
@@ -184,49 +200,138 @@ namespace Sensors
         if (rv == 0)
           throw std::runtime_error(DTR("invalid read size"));
 
-        switch (m_state)
+        if (m_state < MSTA_SEEK_HDR)
         {
-          case 0: // INIT
-            m_line.append(m_buffer, rv);
-            if (m_line.size() > c_read_buffer_size)
-              m_line.erase(0, m_line.size() - c_read_buffer_size);
+          m_line.append(m_buffer, rv);
+          if (m_line.size() > c_read_buffer_size)
+            m_line.erase(0, m_line.size() - c_read_buffer_size);
 
-            auth();
-            break;
+          switch (m_state)
+          {
+            case MSTA_INIT:
+              auth();
+              break;
 
-          case 1: // CONF
-            m_line.append(m_buffer, rv);
-            if (m_line.size() > c_read_buffer_size)
-              m_line.erase(0, m_line.size() - c_read_buffer_size);
+            case MSTA_CONF:
+              conf();
+              break;
 
-            conf();
-            break;
-
-          case 2: // CAPTURE
-            m_line.append(m_buffer, rv);
-            if (m_line.size() > c_read_buffer_size)
-              m_line.erase(0, m_line.size() - c_read_buffer_size);
-
-            while ((pos = m_line.find('\n')) != std::string::npos)
-            {
-              IMC::DevDataText line;
-              line.value = m_line.substr(0, pos - 1);
-              m_line.erase(0, pos + 1);
-              dispatch(line);
-            }
-            break;
-
-          case 3: // ERROR
-          default:
-            m_line.append(m_buffer, rv);
-            if (m_line.size() > c_read_buffer_size)
-              m_line.erase(0, m_line.size() - c_read_buffer_size);
-
-            if ((pos = m_line.find('\n')) != std::string::npos)
-              throw std::runtime_error(m_line.substr(0, pos - 1));
-
-            break;
+            case MSTA_ERROR:
+              if ((pos = m_line.find('\n')) != std::string::npos)
+                throw std::runtime_error(m_line.substr(0, pos - 1));
+              break;
+          }
         }
+        else
+        {
+          size_t len, i;
+
+          pos = 0; // current position in m_buffer[]
+          while (pos < rv)
+          {
+            switch (m_state)
+            {
+              case MSTA_SEEK_HDR: // seek header in input buffer
+                for (; pos < rv; ++pos)
+                  if ((uint8_t)m_buffer[pos] == 0xA5)
+                  {
+                    m_state = MSTA_CACHE_HDR;
+                    m_cached = 0;
+                    break;
+                  }
+
+                break;
+
+              case MSTA_SEEK_CACHED_HDR: // seek header in cache
+                for (i = 1; i < m_cached; ++i)
+                  if ((uint8_t)m_cache[i] == 0xA5)
+                  {
+                    std::memmove(m_cache, m_cache + i, m_cached - i);
+                    m_cached -= i;
+                    m_state = MSTA_CACHE_HDR;
+                    break;
+                  }
+
+                if (m_state != MSTA_CACHE_HDR && i == m_cached) // not found
+                {
+                  m_state = MSTA_SEEK_HDR;
+                }
+
+                break;
+
+              case MSTA_CACHE_HDR:
+                len = std::min(rv - pos, (size_t)HDR_SIZE - m_cached);
+                std::memcpy(m_cache + m_cached, m_buffer + pos, len);
+                m_cached += len;
+                pos += len;
+
+                if (m_cached == HDR_SIZE)
+                {
+                  uint16_t sum = m_cache[8] | m_cache[9] << 8;
+
+                  if (m_cache[1] != HDR_SIZE || sum != checksum(m_cache, HDR_SIZE - 2))
+                    m_state = MSTA_SEEK_CACHED_HDR;
+                  else
+                    m_state = MSTA_CACHE_DATA;
+                }
+
+                break;
+
+              case MSTA_CACHE_DATA:
+                size_t datalen = m_cache[4] | m_cache[5] << 8;
+
+                len = std::min(rv - pos, (size_t)HDR_SIZE + datalen - m_cached);
+                std::memcpy(m_cache + m_cached, m_buffer + pos, len);
+                m_cached += len;
+                pos += len;
+
+                if (m_cached == HDR_SIZE + datalen)
+                {
+                  uint16_t sum = m_cache[6] | m_cache[7] << 8;
+
+                  if (sum != checksum(m_cache + HDR_SIZE, datalen))
+                    m_state = MSTA_SEEK_CACHED_HDR;
+                  else
+                  {
+                    processFrame();
+                    m_state = MSTA_SEEK_HDR;
+                  }
+                }
+
+                break;
+            }
+          }
+        }
+      }
+
+      void
+      processFrame(void)
+      {
+        if (m_cache[2] == 0x17) // ID == Bottom Track Data Record
+          return;
+
+        IMC::DevDataBinary data;
+        data.value.assign(m_cache, m_cache + m_cached);
+        dispatch(data);
+      }
+
+      uint16_t
+      checksum(uint8_t *data, size_t len)
+      {
+        uint16_t rs = 0xB58C;
+        size_t nshorts = len >> 1;
+        len -= nshorts << 1;
+
+        while (nshorts--)
+        {
+          rs += (uint16_t)data[0] | ((uint16_t)data[1] << 8);
+          data += 2;
+        }
+
+        if (len)
+          rs += ((uint16_t)data[0]) << 8;
+
+        return rs;
       }
 
       void
