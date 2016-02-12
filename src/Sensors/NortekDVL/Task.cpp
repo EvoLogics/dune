@@ -283,6 +283,9 @@ namespace Sensors
       void
       processBottomTrack(const char *data, size_t len)
       {
+        uint32_t status;
+        std::memcpy(&status, data + HDR_SIZE + 20, sizeof(float));
+
         float vx, vy, vz;
         std::memcpy(&vx, data + HDR_SIZE + 132, sizeof(float));
         std::memcpy(&vy, data + HDR_SIZE + 136, sizeof(float));
@@ -290,7 +293,9 @@ namespace Sensors
         m_gvel.x = vx;
         m_gvel.y = vy;
         m_gvel.z = vz;
-        dispatch(m_gvel);
+
+        if (((status >> 12) & 0x07) == 0x07)
+          dispatch(m_gvel);
 
         float prs;
         std::memcpy(&prs, data + HDR_SIZE + 32, sizeof(float));
@@ -302,9 +307,10 @@ namespace Sensors
         m_temp.value = temp;
         dispatch(m_temp);
 
-        inf("vel: (%.2f, %.2f, %.2f), prs: %f, temp: %f",
+        spew("vel: (%.2f, %.2f, %.2f), prs: %.2f, temp: %.1f, valid_bits: %d%d%d",
                 m_gvel.x, m_gvel.y, m_gvel.z,
-                prs * 10, temp);
+                prs * 10, temp,
+                (status >> 12) & 1, (status >> 13) & 1, (status >> 14) & 1);
 
         (void)len;
       }
@@ -312,14 +318,15 @@ namespace Sensors
       void
       processAverageData(const char *data, size_t len)
       {
-        uint16_t yaw;
-        int16_t roll, pitch;
-        std::memcpy(&roll,  data + HDR_SIZE + 24, sizeof(uint16_t));
-        std::memcpy(&pitch, data + HDR_SIZE + 26, sizeof(int16_t));
-        std::memcpy(&yaw,   data + HDR_SIZE + 28, sizeof(int16_t));
+        // uint16_t yaw;
+        // int16_t roll, pitch;
+        // std::memcpy(&roll,  data + HDR_SIZE + 24, sizeof(uint16_t));
+        // std::memcpy(&pitch, data + HDR_SIZE + 26, sizeof(int16_t));
+        // std::memcpy(&yaw,   data + HDR_SIZE + 28, sizeof(int16_t));
 
-        inf("rpy: (%.2f , %.2f, %.2f)",
-                (float)roll * 0.01, (float)pitch * 0.01, (float)yaw * 0.01);
+        // spew("rpy: (%.2f , %.2f, %.2f)",
+        //         (float)roll, (float)pitch, (float)yaw);
+        (void)data;
         (void)len;
       }
 
