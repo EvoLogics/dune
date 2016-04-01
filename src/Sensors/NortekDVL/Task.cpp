@@ -284,15 +284,19 @@ namespace Sensors
       processBottomTrack(const char *data, size_t len)
       {
         uint32_t status;
-        std::memcpy(&status, data + HDR_SIZE + 20, sizeof(float));
+        std::memcpy(&status, data + HDR_SIZE + 20, sizeof(uint32_t));
 
         float vx, vy, vz;
         std::memcpy(&vx, data + HDR_SIZE + 132, sizeof(float));
         std::memcpy(&vy, data + HDR_SIZE + 136, sizeof(float));
         std::memcpy(&vz, data + HDR_SIZE + 140, sizeof(float));
+
+        // TODO: add rotation of DVL-frame
+
         m_gvel.x = vx;
         m_gvel.y = vy;
         m_gvel.z = vz;
+        m_gvel.validity = (status >> 12) & 7;
 
         if (((status >> 12) & 0x07) == 0x07)
           dispatch(m_gvel);
