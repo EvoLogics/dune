@@ -313,8 +313,7 @@ namespace Sensors
         m_gvel.z = vx * m_dcm[6] + vy * m_dcm[7] + vz * m_dcm[8];
         m_gvel.validity = (status >> 12) & 7;
 
-        if (((status >> 12) & 0x07) == 0x07)
-          dispatch(m_gvel);
+        dispatch(m_gvel);
 
         float prs;
         std::memcpy(&prs, data + HDR_SIZE + 32, sizeof(float));
