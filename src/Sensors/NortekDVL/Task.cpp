@@ -114,7 +114,7 @@ namespace Sensors
         .description("Password to athenticate command interface");
 
         param("Input Rate", m_args.params.rate)
-        .defaultValue("4.0")
+        .defaultValue("8.0")
         .minimumValue("0.0")
         .description("Input rate");
 

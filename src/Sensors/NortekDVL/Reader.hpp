@@ -162,13 +162,13 @@ namespace Sensors
               break;
 
             case 1:
-              str = String::str("SETDVL,0,\"OFF\",\"INTSR\",%.1f,\"\",%.1f,%.1f\r\n",
+              str = String::str("SETDVL,0,\"INTSR\",%.1f,\"\",%.1f,%.1f\r\n",
                       m_param.rate, m_param.sndvel, m_param.salinity);
               m_handle->writeString(str.c_str());
               break;
 
             case 2:
-              str = String::str("SETBT,%.2f,%.2f,4,0,21,%.1f,\"XYZ\"\r\n",
+              str = String::str("SETBT,%.2f,%.2f,4,0,21,%.1f,\"OFF\",22,0.01,\"MAX\"\r\n",
                       m_param.bt_range, m_param.v_range, m_param.pwr_level);
               m_handle->writeString(str.c_str());
               break;
