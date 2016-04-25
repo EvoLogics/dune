@@ -36,6 +36,8 @@
 // Local headers.
 #include "Reader.hpp"
 
+const double deg2rad = M_PI / 180.0;
+
 namespace Sensors
 {
   //! Device driver for NMEA capable %GPS devices.
@@ -56,6 +58,8 @@ namespace Sensors
       float inp_tout;
       //! Power channels.
       std::vector<std::string> pwr_channels;
+      //! Rotation angles of DVL-frame
+      std::vector<double> rotation;
 
       Reader::NortekParam params;
     };
@@ -73,12 +77,15 @@ namespace Sensors
       std::string m_init_line;
       //! Reader thread.
       Reader* m_reader;
+      double m_dcm[9];
 
       Task(const std::string& name, Tasks::Context& ctx):
         Tasks::Task(name, ctx),
         m_handle(NULL),
         m_reader(NULL)
       {
+        updateDCM(0, 0, 0);
+
         // Define configuration parameters.
         param("Serial Port - Device", m_args.uart_dev)
         .defaultValue("")
@@ -131,6 +138,11 @@ namespace Sensors
         .defaultValue("-20.0")
         .description("Power level");
 
+        param("Rotation", m_args.rotation)
+        .defaultValue("0, 0, 0")
+        .size(3)
+        .description("Rotation angles of DVL-frame");
+
         m_euler.setSourceEntity(getEntityId());
         m_prs.setSourceEntity(getEntityId());
         m_temp.setSourceEntity(getEntityId());
@@ -155,6 +167,11 @@ namespace Sensors
               paramChanged(m_args.params.pwr_level))
             m_reader->reconfigure(m_args.params);
         }
+
+        if (paramChanged(m_args.rotation))
+            updateDCM(m_args.rotation[0] * deg2rad,
+                      m_args.rotation[1] * deg2rad,
+                      m_args.rotation[2] * deg2rad);
       }
 
       void
@@ -291,11 +308,9 @@ namespace Sensors
         std::memcpy(&vy, data + HDR_SIZE + 136, sizeof(float));
         std::memcpy(&vz, data + HDR_SIZE + 140, sizeof(float));
 
-        // TODO: add rotation of DVL-frame
-
-        m_gvel.x = vx;
-        m_gvel.y = vy;
-        m_gvel.z = vz;
+        m_gvel.x = vx * m_dcm[0] + vy * m_dcm[1] + vz * m_dcm[2];
+        m_gvel.y = vx * m_dcm[3] + vy * m_dcm[4] + vz * m_dcm[5];
+        m_gvel.z = vx * m_dcm[6] + vy * m_dcm[7] + vz * m_dcm[8];
         m_gvel.validity = (status >> 12) & 7;
 
         if (((status >> 12) & 0x07) == 0x07)
@@ -332,6 +347,25 @@ namespace Sensors
         //         (float)roll, (float)pitch, (float)yaw);
         (void)data;
         (void)len;
+      }
+
+      void
+      updateDCM(double roll, double pitch, double yaw)
+      {
+        double cr = cos(roll), cp = cos(pitch), cy = cos(yaw);
+        double sr = sin(roll), sp = sin(pitch), sy = sin(yaw);
+
+        m_dcm[0] = cp * cy;
+        m_dcm[1] = sr * sp * cy - cr * sy;
+        m_dcm[2] = cr * sp * cy + sr * sy;
+
+        m_dcm[3] = cp * sy;
+        m_dcm[4] = sr * sp * sy + cr * cy;
+        m_dcm[5] = cr * sp * sy - sr * cy;
+
+        m_dcm[6] = -sp;
+        m_dcm[7] = sr * cp;
+        m_dcm[8] = cr * cp;
       }
 
       void
