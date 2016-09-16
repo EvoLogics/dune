@@ -60,6 +60,8 @@ namespace Sensors
       std::vector<std::string> pwr_channels;
       //! Rotation angles of DVL-frame
       std::vector<double> rotation;
+      //! Pressure offset in hPa.
+      float poff;
 
       Reader::NortekParam params;
     };
@@ -142,6 +144,10 @@ namespace Sensors
         .defaultValue("0, 0, 0")
         .size(3)
         .description("Rotation angles of DVL-frame");
+
+        param("Pressure Offset", m_args.poff)
+        .defaultValue("0")
+        .description("Pressure offset in hPa");
 
         m_euler.setSourceEntity(getEntityId());
         m_prs.setSourceEntity(getEntityId());
@@ -317,7 +323,7 @@ namespace Sensors
 
         float prs;
         std::memcpy(&prs, data + HDR_SIZE + 32, sizeof(float));
-        m_prs.value = prs * 1000;
+        m_prs.value = prs * 1000 + m_args.poff;
         dispatch(m_prs);
 
         float temp;
