@@ -299,7 +299,7 @@ namespace Sensors
             break;
 
           default:
-            inf("not supported: %" PRIx8, data[2]);
+            inf("not supported: %x", data[2]);
         }
       }
 
