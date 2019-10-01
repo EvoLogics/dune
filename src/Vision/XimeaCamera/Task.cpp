@@ -130,7 +130,7 @@ namespace Vision
         try
         {
           inf("Opening the camera...");
-          //XICE(xiOpenDevice(0, &xiH));
+          XICE(xiOpenDevice(0, &xiH));
         }
         catch(...)
         {
@@ -151,7 +151,7 @@ namespace Vision
         try
         {
           inf("Setting exposure time to 10ms...");
-          //XICE(xiSetParamInt(xiH, XI_PRM_EXPOSURE, 10000));
+          XICE(xiSetParamInt(xiH, XI_PRM_EXPOSURE, 10000));
 
           memset(&image, 0, sizeof(image));
           image.size = sizeof(XI_IMG);
@@ -199,7 +199,7 @@ namespace Vision
       //! Command syntax:
       //! [S][cmd][<-payload->][/][any] = 4 + payload bytes
       //! cmd: T - Trigger
-      //! payload: [n_frames][btm_tr][top_tr][btm_fl][top_fl] = 10 bytes
+      //! payload: [btm_tr][top_tr][n_frames][btm_fl][top_fl] = 10 bytes
 
       void
       readCmd(const double& timeout)
@@ -217,13 +217,16 @@ namespace Vision
             {
               if (m_bfr[1] == 'T' and rv >= 14)
               {
-                unsigned int n_frames = byteFromHex(&m_bfr[2]);
-                unsigned int ind_tr = wordFromHex(&m_bfr[4]);
+                unsigned int ind_tr = wordFromHex(&m_bfr[2]);
+                unsigned int n_frames = byteFromHex(&m_bfr[6]);
                 unsigned int ind_fl = wordFromHex(&m_bfr[8]);
 
-                spew("n_frames: %u", n_frames);
                 spew("ind_tr: %u", ind_tr);
+                spew("n_frames: %u", n_frames);
                 spew("ind_fl: %u", ind_fl);
+
+                if (n_frames > 0)
+                  getImages(n_frames);
               }
             }
           }
@@ -240,12 +243,14 @@ namespace Vision
         inf("Starting acquisition...");
         XICE(xiStartAcquisition(xiH));
 
+        double t_start = Clock::getSinceEpoch();
         for (uint images = 0; images < count; images++)
         {
           xiGetImage(xiH, 5000, &image); // getting next image from the camera opened
           unsigned char pixel = *(unsigned char*)image.bp;
           inf("Image %d (%dx%d) received from camera. First pixel value: %d", images, (int)image.width, (int)image.height, pixel);
         }
+        inf("Acquired %u images in %0.3fs", count, Clock::getSinceEpoch() - t_start);
 
         inf("Stopping acquisition...");
         XICE(xiStopAcquisition(xiH));
@@ -257,8 +262,8 @@ namespace Vision
       {
         while (!stopping())
         {
-          readCmd(0.1);
-          waitForMessages(0.1);
+          readCmd(0.02);
+          waitForMessages(0.02);
         }
       }
     };
