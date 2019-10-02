@@ -28,6 +28,7 @@
 
 if(XIAPI)
   dune_test_lib(m3api xiOpenDevice)
+  dune_test_lib(xiapi_dng_store xidngStore)
   if (DUNE_OS_WINDOWS)
     dune_test_header(xiApi.h)
   else(DUNE_OS_WINDOWS)

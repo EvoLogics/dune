@@ -31,9 +31,9 @@
 
 // Vendor headers.
 #ifdef DUNE_OS_WINDOWS
-#include <xiApi.h>
+#include <xiapi_dng_store.h>
 #else
-#include <m3api/xiApi.h>
+#include <m3api/xiapi_dng_store.h>
 #endif
 
 // Check error macro. It executes function. Print and throw error if result is not OK.
@@ -69,8 +69,10 @@ namespace Vision
       //! Buffer.
       uint8_t m_bfr[1024];
 
-      //! Camera ID
+      //! Camera ID.
       uint16_t m_id;
+      //! Destination log folder.
+      Path m_log_dir;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -152,6 +154,7 @@ namespace Vision
         {
           inf("Setting exposure time to 10ms...");
           XICE(xiSetParamInt(xiH, XI_PRM_EXPOSURE, 10000));
+          XICE(xiSetParamInt(xiH, XI_PRM_IMAGE_DATA_FORMAT, XI_RAW16));
 
           memset(&image, 0, sizeof(image));
           image.size = sizeof(XI_IMG);
@@ -160,6 +163,8 @@ namespace Vision
         {
           throw RestartNeeded("Failed to initialize the camera", 10);
         }
+
+        m_log_dir = m_ctx.dir_log / "Photos";
       }
 
       //! Release resources.
@@ -249,6 +254,21 @@ namespace Vision
           xiGetImage(xiH, 5000, &image); // getting next image from the camera opened
           unsigned char pixel = *(unsigned char*)image.bp;
           inf("Image %d (%dx%d) received from camera. First pixel value: %d", images, (int)image.width, (int)image.height, pixel);
+
+          double timestamp = Clock::getSinceEpoch();
+          Path file = m_log_dir / String::str("%0.4f.dng", timestamp);
+
+          inf("Writing DNG...");
+          XI_DNG_METADATA metadata;
+          try
+          {
+          xidngFillMetadataFromCameraParams(xiH, &metadata);
+          }
+          catch(...)
+          {
+          err("foo");
+          }
+          XICE(xidngStore(file.c_str(), &image, &metadata));
         }
         inf("Acquired %u images in %0.3fs", count, Clock::getSinceEpoch() - t_start);
 
