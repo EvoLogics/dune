@@ -300,8 +300,15 @@ namespace Vision
               spew("n_frames: %u", n_frames);
               spew("ind_fl: %u", ind_fl);
 
+              if (checkId(ind_fl))
+              {
+                xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_EXPOSURE_PULSE);
+              }
+
               if (n_frames > 0)
                 getImages(n_frames);
+
+              xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_OFF);
             }
             else if (m_bfr[1] == 'E' and rv >= 10)
             {
