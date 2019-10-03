@@ -52,6 +52,7 @@ namespace Vision
       Address udp_maddr;
       uint16_t udp_port;
       uint16_t base_id;
+      unsigned int exposure;
     };
 
     struct Task: public DUNE::Tasks::Task
@@ -71,6 +72,8 @@ namespace Vision
 
       //! Camera ID.
       uint16_t m_id;
+      unsigned int m_id_bm;
+
       //! Destination log folder.
       Path m_log_dir;
 
@@ -81,7 +84,8 @@ namespace Vision
         DUNE::Tasks::Task(name, ctx),
         xiH(NULL),
         m_sock(NULL),
-        m_id(0)
+        m_id(0),
+        m_id_bm(0)
       {
         param("UDP Communications -- Multicast Address", m_args.udp_maddr)
         .defaultValue("227.0.0.1")
@@ -94,12 +98,19 @@ namespace Vision
         param("Base ID", m_args.base_id)
         .defaultValue("0x8400")
         .description("Base ID to subtract and get Camera Module ID");
+
+        param("Exposure", m_args.exposure)
+        .defaultValue("10")
+        .units(Units::Millisecond)
+        .description("Exposure time for the camera, 0 for auto");
       }
 
       //! Update internal state with new parameter values.
       void
       onUpdateParameters(void)
       {
+        if (paramChanged(m_args.exposure))
+          setExposure(m_args.exposure);
       }
 
       //! Reserve entity identifiers.
@@ -128,6 +139,8 @@ namespace Vision
         }
 
         inf("Camera Module ID is: %u (%s)", m_id, m_id > c_max_id / 2 ? "bottom" : "top");
+        m_id_bm = 1 << (m_id - 1 + (m_id > c_max_id / 2 ? 2 : 0));
+        debug("Camera Module ID bitmask is: %u", m_id_bm);
 
         try
         {
@@ -152,9 +165,13 @@ namespace Vision
       {
         try
         {
-          inf("Setting exposure time to 10ms...");
-          XICE(xiSetParamInt(xiH, XI_PRM_EXPOSURE, 10000));
+          setExposure(m_args.exposure);
           XICE(xiSetParamInt(xiH, XI_PRM_IMAGE_DATA_FORMAT, XI_RAW16));
+          std::string sys_name = getSystemName();
+          XICE(xiSetParamString(xiH, XI_PRM_DEVICE_USER_ID, (void*)sys_name.c_str(), (DWORD)sizeof(sys_name)));
+          //XICE(xiSetParamFloat(xiH, XI_PRM_LENS_FOCAL_LENGTH XI_PRM_INFO_MIN, 8));
+          //XICE(xiSetParamFloat(xiH, XI_PRM_LENS_FOCAL_LENGTH XI_PRM_INFO_MAX, 8));
+          //XICE(xiSetParamFloat(xiH, XI_PRM_LENS_APERTURE_VALUE, 6));
 
           memset(&image, 0, sizeof(image));
           image.size = sizeof(XI_IMG);
@@ -175,6 +192,29 @@ namespace Vision
           XICE(xiCloseDevice(xiH));
 
         Memory::clear(m_sock);
+      }
+
+      bool
+      checkId(unsigned int index)
+      {
+        return ((index & m_id_bm) != 0);
+      }
+
+      void
+      setExposure(unsigned int exposure)
+      {
+        if (xiH == NULL)
+          return;
+        if (exposure == 0)
+        {
+          inf("Activating AEAG...");
+          XICE(xiSetParamInt(xiH, XI_PRM_AEAG, XI_ON));
+        }
+        else
+        {
+          inf("Setting exposure time to %ums...", exposure);
+          XICE(xiSetParamInt(xiH, XI_PRM_EXPOSURE, exposure * 1000));
+        }
       }
 
       unsigned int
@@ -218,21 +258,31 @@ namespace Vision
           {
             size_t rv = m_sock->read(m_bfr, sizeof(m_bfr), &addr, &port);
             spew("received %u bytes from %s:%u", (unsigned)rv, addr.c_str(), port);
-            if (m_bfr[0] == 'S' and m_bfr[rv - 2] == '/')
+
+            if (rv < 8 or m_bfr[0] != 'S' or m_bfr[rv - 2] != '/')
+              return;
+
+            unsigned int ind_id = wordFromHex(&m_bfr[2]);
+            spew("ind_id: %u", ind_id);
+
+            if (not checkId(ind_id))
+              return;
+
+            if (m_bfr[1] == 'T' and rv >= 14)
             {
-              if (m_bfr[1] == 'T' and rv >= 14)
-              {
-                unsigned int ind_tr = wordFromHex(&m_bfr[2]);
-                unsigned int n_frames = byteFromHex(&m_bfr[6]);
-                unsigned int ind_fl = wordFromHex(&m_bfr[8]);
+              unsigned int n_frames = byteFromHex(&m_bfr[6]);
+              unsigned int ind_fl = wordFromHex(&m_bfr[8]);
 
-                spew("ind_tr: %u", ind_tr);
-                spew("n_frames: %u", n_frames);
-                spew("ind_fl: %u", ind_fl);
+              spew("n_frames: %u", n_frames);
+              spew("ind_fl: %u", ind_fl);
 
-                if (n_frames > 0)
-                  getImages(n_frames);
-              }
+              if (n_frames > 0)
+                getImages(n_frames);
+            }
+            else if(m_bfr[1] == 'E' and rv >= 10)
+            {
+              m_args.exposure = byteFromHex(&m_bfr[6]);
+              spew("exposure: %u", m_args.exposure);
             }
           }
         }
@@ -255,19 +305,22 @@ namespace Vision
           unsigned char pixel = *(unsigned char*)image.bp;
           inf("Image %d (%dx%d) received from camera. First pixel value: %d", images, (int)image.width, (int)image.height, pixel);
 
-          double timestamp = Clock::getSinceEpoch();
-          Path file = m_log_dir / String::str("%0.4f.dng", timestamp);
+          inf("tsSec: %u, tsUSec: %u", image.tsSec, image.tsUSec);
 
           inf("Writing DNG...");
           XI_DNG_METADATA metadata;
           try
           {
-          xidngFillMetadataFromCameraParams(xiH, &metadata);
+            xidngFillMetadataFromCameraParams(xiH, &metadata);
+            inf("%u", metadata.acqTimeMonth);
           }
           catch(...)
           {
-          err("foo");
+            war("Failed to fill metadata.");
           }
+          Path file = m_log_dir / String::str("%04u%02u%02u_%02u%02u%02u_%06u.dng", metadata.acqTimeYear,
+              metadata.acqTimeMonth, metadata.acqTimeDay, metadata.acqTimeHour,
+              metadata.acqTimeMinute, metadata.acqTimeSecond, image.tsUSec);
           XICE(xidngStore(file.c_str(), &image, &metadata));
         }
         inf("Acquired %u images in %0.3fs", count, Clock::getSinceEpoch() - t_start);
