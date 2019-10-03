@@ -53,6 +53,7 @@ namespace Vision
       uint16_t udp_port;
       uint16_t base_id;
       unsigned int exposure;
+      unsigned int data_format;
     };
 
     struct Task: public DUNE::Tasks::Task
@@ -103,6 +104,10 @@ namespace Vision
         .defaultValue("10")
         .units(Units::Millisecond)
         .description("Exposure time for the camera, 0 for auto");
+
+        param("Data Format", m_args.data_format)
+        .defaultValue("6")
+        .description("Data format to use for image output, see XI_IMG_FORMAT");
       }
 
       //! Update internal state with new parameter values.
@@ -111,6 +116,9 @@ namespace Vision
       {
         if (paramChanged(m_args.exposure))
           setExposure(m_args.exposure);
+
+        if (paramChanged(m_args.data_format))
+          setExposure(m_args.data_format);
       }
 
       //! Reserve entity identifiers.
@@ -165,8 +173,8 @@ namespace Vision
       {
         try
         {
+          setDataFormat(m_args.data_format);
           setExposure(m_args.exposure);
-          XICE(xiSetParamInt(xiH, XI_PRM_IMAGE_DATA_FORMAT, XI_RAW16));
           std::string sys_name = getSystemName();
           XICE(xiSetParamString(xiH, XI_PRM_DEVICE_USER_ID, (void*)sys_name.c_str(), (DWORD)sizeof(sys_name)));
           //XICE(xiSetParamFloat(xiH, XI_PRM_LENS_FOCAL_LENGTH XI_PRM_INFO_MIN, 8));
@@ -198,6 +206,16 @@ namespace Vision
       checkId(unsigned int index)
       {
         return ((index & m_id_bm) != 0);
+      }
+
+      void
+      setDataFormat(unsigned int df)
+      {
+        //! Use only raw formats.
+        if (!(df == XI_RAW8 or df == XI_RAW16))
+          return;
+        inf("Setting data format to %u...", df);
+        XICE(xiSetParamInt(xiH, XI_PRM_IMAGE_DATA_FORMAT, df));
       }
 
       void
@@ -244,7 +262,11 @@ namespace Vision
       //! Command syntax:
       //! [S][cmd][<-payload->][/][any] = 4 + payload bytes
       //! cmd: T - Trigger
-      //! payload: [btm_tr][top_tr][n_frames][btm_fl][top_fl] = 10 bytes
+      //! cmd: E - Exposure
+      //! cmd: D - Data Format
+      //! payload_T: [btm_id][top_id][n_frames][btm_fl][top_fl] = 10 bytes
+      //! payload_E: [btm_id][top_id][exposure] = 6 bytes
+      //! payload_D: [btm_id][top_id][data_format] = 6 bytes
 
       void
       readCmd(const double& timeout)
@@ -279,10 +301,17 @@ namespace Vision
               if (n_frames > 0)
                 getImages(n_frames);
             }
-            else if(m_bfr[1] == 'E' and rv >= 10)
+            else if (m_bfr[1] == 'E' and rv >= 10)
             {
               m_args.exposure = byteFromHex(&m_bfr[6]);
               spew("exposure: %u", m_args.exposure);
+              setExposure(m_args.exposure);
+            }
+            else if (m_bfr[1] == 'D' and rv >= 10)
+            {
+              m_args.data_format = byteFromHex(&m_bfr[6]);
+              spew("data_format: %u", m_args.data_format);
+              setDataFormat(m_args.data_format);
             }
           }
         }
