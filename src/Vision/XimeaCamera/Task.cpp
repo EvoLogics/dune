@@ -190,6 +190,8 @@ namespace Vision
         }
 
         m_log_dir = m_ctx.dir_log / "Photos";
+        if (!m_log_dir.exists())
+          m_log_dir.create();
       }
 
       //! Release resources.
@@ -287,7 +289,7 @@ namespace Vision
             unsigned int ind_id = wordFromHex(&m_bfr[2]);
             spew("ind_id: %u", ind_id);
 
-            if (not checkId(ind_id))
+            if (!checkId(ind_id))
               return;
 
             if (m_bfr[1] == 'T' and rv >= 14)
@@ -331,17 +333,11 @@ namespace Vision
         for (uint images = 0; images < count; images++)
         {
           xiGetImage(xiH, 5000, &image); // getting next image from the camera opened
-          unsigned char pixel = *(unsigned char*)image.bp;
-          inf("Image %d (%dx%d) received from camera. First pixel value: %d", images, (int)image.width, (int)image.height, pixel);
 
-          inf("tsSec: %u, tsUSec: %u", image.tsSec, image.tsUSec);
-
-          inf("Writing DNG...");
           XI_DNG_METADATA metadata;
           try
           {
             xidngFillMetadataFromCameraParams(xiH, &metadata);
-            inf("%u", metadata.acqTimeMonth);
           }
           catch(...)
           {
@@ -350,10 +346,10 @@ namespace Vision
           Path file = m_log_dir / String::str("%04u%02u%02u_%02u%02u%02u_%06u.dng", metadata.acqTimeYear,
               metadata.acqTimeMonth, metadata.acqTimeDay, metadata.acqTimeHour,
               metadata.acqTimeMinute, metadata.acqTimeSecond, image.tsUSec);
+          trace("Writing %s", file.c_str());
           XICE(xidngStore(file.c_str(), &image, &metadata));
         }
         inf("Acquired %u images in %0.3fs", count, Clock::getSinceEpoch() - t_start);
-
         inf("Stopping acquisition...");
         XICE(xiStopAcquisition(xiH));
       }
