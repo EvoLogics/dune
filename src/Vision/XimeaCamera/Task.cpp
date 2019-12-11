@@ -177,9 +177,6 @@ namespace Vision
           setExposure(m_args.exposure);
           std::string sys_name = getSystemName();
           XICE(xiSetParamString(xiH, XI_PRM_DEVICE_USER_ID, (void*)sys_name.c_str(), (DWORD)sizeof(sys_name)));
-          //XICE(xiSetParamFloat(xiH, XI_PRM_LENS_FOCAL_LENGTH XI_PRM_INFO_MIN, 8));
-          //XICE(xiSetParamFloat(xiH, XI_PRM_LENS_FOCAL_LENGTH XI_PRM_INFO_MAX, 8));
-          //XICE(xiSetParamFloat(xiH, XI_PRM_LENS_APERTURE_VALUE, 6));
 
           memset(&image, 0, sizeof(image));
           image.size = sizeof(XI_IMG);
@@ -260,6 +257,10 @@ namespace Vision
         ss >> result;
         return result;
       }
+
+      //! add fps limit
+      //! add led dimming
+      //! report capture status
 
       //! Command syntax:
       //! [S][cmd][<-payload->][/][any] = 4 + payload bytes
@@ -350,9 +351,14 @@ namespace Vision
           {
             war("Failed to fill metadata.");
           }
-          Path file = m_log_dir / String::str("%04u%02u%02u_%02u%02u%02u_%06u.dng", metadata.acqTimeYear,
-              metadata.acqTimeMonth, metadata.acqTimeDay, metadata.acqTimeHour,
-              metadata.acqTimeMinute, metadata.acqTimeSecond, image.tsUSec);
+          //! Use own timestamp for consistency
+          double now = Clock::getSinceEpoch();
+          uint64_t t_sec = trunc(now);
+          unsigned t_usec = trunc((now - t_sec) * 1000000);
+          Time::BrokenDown bdt(t_sec);
+          Path file = m_log_dir / String::str("%04u%02u%02u_%02u%02u%02u_%06u.dng", bdt.year,
+              bdt.month, bdt.day, bdt.hour, bdt.minutes, bdt.seconds, t_usec);
+
           trace("Writing %s", file.c_str());
           XICE(xidngStore(file.c_str(), &image, &metadata));
         }
