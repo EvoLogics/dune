@@ -41,6 +41,10 @@ namespace Actuators
       std::string io_dev;
       // Serial port baud rate.
       unsigned io_baud;
+      // Serial port write delay.
+      unsigned io_wdelay;
+      // Pulse period.
+      unsigned pwm_per;
       // Pulse duration.
       unsigned pwm_all;
       // Dimming value.
@@ -72,14 +76,24 @@ namespace Actuators
         .defaultValue("")
         .description("Device to connect: tcp socket or serial port");
 
-        param("Baud Rate", m_args.io_baud)
+        param("IO Baud Rate", m_args.io_baud)
         .defaultValue("115200")
         .description("Baud rate for serial connection");
+
+        param("IO Write Delay", m_args.io_wdelay)
+        .units(Units::Millisecond)
+        .defaultValue("0")
+        .description("Delay after putting each char to serial device - workaround, in milliseconds");
+
+        param("Pulse Period", m_args.pwm_per)
+        .units(Units::Millisecond)
+        .defaultValue("1000")
+        .description("Pulse period, in milliseconds");
 
         param("Pulse Duration", m_args.pwm_all)
         .units(Units::Millisecond)
         .defaultValue("20")
-        .description("Pulse duration (duty cycle, in microseconds)");
+        .description("Pulse duration (duty cycle, in milliseconds)");
 
         param("Dimming Value", m_args.dac_all)
         .units(Units::Percentage)
@@ -98,6 +112,9 @@ namespace Actuators
 
         if (paramChanged(m_args.io_dev) || paramChanged(m_args.io_baud))
           throw RestartNeeded(DTR("restarting to change IO parameters"), 1);
+
+        if (paramChanged(m_args.pwm_per))
+          setPwmPer(m_args.pwm_per);
 
         if (paramChanged(m_args.pwm_all))
           setPwmAll(m_args.pwm_all);
@@ -143,8 +160,7 @@ namespace Actuators
       void
       onResourceInitialization(void)
       {
-        setPwmAll(m_args.pwm_all);
-        setDacAll(m_args.dac_all);
+        configure();
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
       }
 
@@ -174,6 +190,21 @@ namespace Actuators
       }
 
       void
+      configure(void)
+      {
+        setPwmPer(m_args.pwm_per);
+        setPwmAll(m_args.pwm_all);
+        setDacAll(m_args.dac_all);
+      }
+
+      void
+      setPwmPer(const unsigned period)
+      {
+        std::string cmd = String::str("PWM.PER=%u", period * 1000);
+        sendCmd(cmd);
+      }
+
+      void
       setPwmAll(const unsigned duration)
       {
         std::string cmd = String::str("PWM.ALL=%u", duration * 1000);
@@ -193,7 +224,19 @@ namespace Actuators
         std::string reply = (String::str(">%s\n", command.c_str()));
         try
         {
-          m_iohandle->write(reply.c_str(), reply.size());
+          if (m_args.io_wdelay == 0)
+          {
+            m_iohandle->write(reply.c_str(), reply.size());
+          }
+          else
+          {
+            Delay::waitMsec(m_args.io_wdelay);
+            for (size_t i = 0; i < reply.size(); ++i)
+            {
+              m_iohandle->write(&reply[i], 1);
+              Delay::waitMsec(m_args.io_wdelay);
+            }
+          }
           inf("Sent Cmd: %s", command.c_str());
         }
         catch(std::exception& e)
@@ -213,9 +256,17 @@ namespace Actuators
 
         size_t rv = m_iohandle->read(m_bfr, c_bfr_size);
 
-        std::string msg((char*)m_bfr, rv - 1);
+        std::string msg((char*)m_bfr, rv);
         msg = String::rtrim(msg);
-        spew("rcvd: %s", msg.c_str());
+
+        debug("rcvd: %s", msg.c_str());
+
+        // TODO: consider a better way to do this
+        if (msg.find("all ready") != std::string::npos)
+        {
+          inf("(re)boot detected!");
+          configure();
+        }
 
         return true;
       }
