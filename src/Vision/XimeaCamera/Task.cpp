@@ -58,6 +58,7 @@ namespace Vision
       unsigned int exposure;
       unsigned int data_format;
       fp32_t frame_rate;
+      std::string flash_entity_name;
     };
 
     struct Task: public DUNE::Tasks::Task
@@ -120,6 +121,10 @@ namespace Vision
         param("Frame Rate", m_args.frame_rate)
         .defaultValue("0")
         .description("Limit camera frame rate, 0 for max available");
+
+        param("LED Flash Entity Name", m_args.flash_entity_name)
+        .defaultValue("EvoLamp")
+        .description("LED Flash Entity Name to send the commands");
       }
 
       //! Update internal state with new parameter values.
@@ -250,13 +255,46 @@ namespace Vision
       void
       setLedParams(unsigned int pulsew, unsigned int dimming)
       {
-        //stub
+        changeEntityParameter(m_args.flash_entity_name, "Pulse Duration", String::str("%u", pulsew));
+        changeEntityParameter(m_args.flash_entity_name, "Dimming Value", String::str("%u", dimming));
       }
 
       void
       setFrameRate(fp32_t fr)
       {
-        //stub
+        if (fr == 0)
+        {
+          XICE(xiSetParamInt(xiH, XI_PRM_ACQ_TIMING_MODE, XI_ACQ_TIMING_MODE_FREE_RUN));
+        }
+        else
+        {
+          XICE(xiSetParamInt(xiH, XI_PRM_ACQ_TIMING_MODE, XI_ACQ_TIMING_MODE_FRAME_RATE));
+
+          float min_fr = 0;
+          xiGetParamFloat(xiH, XI_PRM_FRAMERATE XI_PRM_INFO_MIN, &min_fr);
+          float max_fr = 0;
+          xiGetParamFloat(xiH, XI_PRM_FRAMERATE XI_PRM_INFO_MAX, &max_fr);
+
+          //! Set framerate in range [min_fr, max_fr].
+          fr = std::min(std::max(fr, min_fr), max_fr);
+          inf("Setting frame rate to %0.2f...", fr);
+
+          XICE(xiSetParamFloat(xiH, XI_PRM_FRAMERATE, fr));
+        }
+
+      }
+
+      void
+      changeEntityParameter(const std::string entity, const std::string parameter, const std::string value)
+      {
+        IMC::EntityParameter e_par;
+        e_par.name = parameter;
+        e_par.value = value;
+
+        IMC::SetEntityParameters e_set;
+        e_set.name = entity;
+        e_set.params.push_back(e_par);
+        dispatch(e_set);
       }
 
       //! report capture status
