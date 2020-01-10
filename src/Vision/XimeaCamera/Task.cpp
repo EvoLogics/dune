@@ -36,6 +36,9 @@
 #include <m3api/xiapi_dng_store.h>
 #endif
 
+// Local headers.
+#include "Parser.hpp"
+
 // Check error macro. It executes function. Print and throw error if result is not OK.
 #define XICE(func) {XI_RETURN stat = (func); if (XI_OK!=stat) {err("Error:%d returned from function:"#func"",stat);throw "Error";}}
 
@@ -54,6 +57,7 @@ namespace Vision
       uint16_t base_id;
       unsigned int exposure;
       unsigned int data_format;
+      fp32_t frame_rate;
     };
 
     struct Task: public DUNE::Tasks::Task
@@ -78,6 +82,9 @@ namespace Vision
       //! Destination log folder.
       Path m_log_dir;
 
+      //! Command Parser.
+      Parser m_parser;
+
       //! Constructor.
       //! @param[in] name task name.
       //! @param[in] ctx context.
@@ -86,7 +93,8 @@ namespace Vision
         xiH(NULL),
         m_sock(NULL),
         m_id(0),
-        m_id_bm(0)
+        m_id_bm(0),
+        m_parser(this)
       {
         param("UDP Communications -- Multicast Address", m_args.udp_maddr)
         .defaultValue("227.0.0.1")
@@ -108,6 +116,10 @@ namespace Vision
         param("Data Format", m_args.data_format)
         .defaultValue("6")
         .description("Data format to use for image output, see XI_IMG_FORMAT");
+
+        param("Frame Rate", m_args.frame_rate)
+        .defaultValue("0")
+        .description("Limit camera frame rate, 0 for max available");
       }
 
       //! Update internal state with new parameter values.
@@ -147,6 +159,7 @@ namespace Vision
         }
 
         inf("Camera Module ID is: %u (%s)", m_id, m_id > c_max_id / 2 ? "bottom" : "top");
+        //! Bitmask L [1][2][3][4][5][6][_][_]  [7][8][9][10][11][12][_][_] H
         m_id_bm = 1 << (m_id - 1 + (m_id > c_max_id / 2 ? 2 : 0));
         debug("Camera Module ID bitmask is: %u", m_id_bm);
 
@@ -234,42 +247,37 @@ namespace Vision
         }
       }
 
-      unsigned int
-      byteFromHex(uint8_t* val)
+      void
+      setLedParams(unsigned int pulsew, unsigned int dimming)
       {
-        unsigned int result;
-        std::stringstream ss;
-        ss << std::hex;
-        for (uint i = 0; i < 2; i++)
-            ss << *(val + i);
-        ss >> result;
-        return result;
+        //stub
       }
 
-      unsigned int
-      wordFromHex(uint8_t* val)
+      void
+      setFrameRate(fp32_t fr)
       {
-        unsigned int result;
-        std::stringstream ss;
-        ss << std::hex;
-        for (uint i = 0; i < 4; i++)
-            ss << *(val + i);
-        ss >> result;
-        return result;
+        //stub
       }
 
-      //! add fps limit
-      //! add led dimming
       //! report capture status
 
       //! Command syntax:
-      //! [S][cmd][<-payload->][/][any] = 4 + payload bytes
+      //! [S][cmd1][<-payload1->][;][cmd2][<-payload2->][/][any] = 4 + payload bytes
+      //! Action:
       //! cmd: T - Trigger
+      //! Option for above:
+      //! cmd: F - Fire LED Flash
+      //! Change parameters:
       //! cmd: E - Exposure
       //! cmd: D - Data Format
-      //! payload_T: [btm_id][top_id][n_frames][btm_fl][top_fl] = 10 bytes
-      //! payload_E: [btm_id][top_id][exposure] = 6 bytes
-      //! payload_D: [btm_id][top_id][data_format] = 6 bytes
+      //! cmd: R - Frame Rate
+      //! cmd: L - LED Flash
+      //! payload_T: [btm_id][top_id][n_frames]         = 6 bytes
+      //! payload_F: [btm_id][top_id]                   = 4 bytes
+      //! payload_E: [btm_id][top_id][exposure]         = 6 bytes
+      //! payload_D: [btm_id][top_id][data_format]      = 6 bytes
+      //! payload_R: [btm_id][top_id][fps]              = 6 bytes
+      //! payload_L: [btm_id][top_id][pulse][dimming]   = 8 bytes
 
       void
       readCmd(const double& timeout)
@@ -287,41 +295,76 @@ namespace Vision
             if (rv < 8 or m_bfr[0] != 'S' or m_bfr[rv - 2] != '/')
               return;
 
-            unsigned int ind_id = wordFromHex(&m_bfr[2]);
-            spew("ind_id: %u", ind_id);
+            bool do_trigger = false;
+            unsigned int n_frames = 0;
+            bool do_flash = false;
 
-            if (!checkId(ind_id))
-              return;
-
-            if (m_bfr[1] == 'T' and rv >= 14)
+            // Iterate discarding first and last received symbols.
+            for (size_t i = 1; i < rv - 1; ++i)
             {
-              unsigned int n_frames = byteFromHex(&m_bfr[6]);
-              unsigned int ind_fl = wordFromHex(&m_bfr[8]);
-
-              spew("n_frames: %u", n_frames);
-              spew("ind_fl: %u", ind_fl);
-
-              if (checkId(ind_fl))
+              if (m_parser.parse(m_bfr[i]))
               {
-                xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_EXPOSURE_PULSE);
-              }
+                spew("type: %c, id: %u, plc: %u", m_parser.getType(), m_parser.getId(), (unsigned)m_parser.getPayloadCount());
 
-              if (n_frames > 0)
-                getImages(n_frames);
+                // Check if the message addressed to this id.
+                if (!checkId(m_parser.getId()))
+                  continue;
+
+                //TODO: check for payload length
+                switch (m_parser.getType())
+                {
+                case 'T':
+                  do_trigger = true;
+                  n_frames = m_parser.getPayload();
+                  spew("n_frames: %u", n_frames);
+                  break;
+
+                case 'F':
+                  do_flash = true;
+                  break;
+
+                case 'E':
+                  m_args.exposure = m_parser.getPayload();
+                  spew("exposure: %u", m_args.exposure);
+                  setExposure(m_args.exposure);
+                  break;
+
+                case 'D':
+                  m_args.data_format = m_parser.getPayload();
+                  spew("data_format: %u", m_args.data_format);
+                  setDataFormat(m_args.data_format);
+                  break;
+
+                case 'R':
+                  m_args.frame_rate = m_parser.getPayload() / 10.0;
+                  spew("frame_rate: %0.2f", m_args.frame_rate);
+                  setFrameRate(m_args.frame_rate);
+                  break;
+
+                case 'L':
+                {
+                  unsigned int pulsew = m_parser.getPayload(0);
+                  unsigned int dimming = m_parser.getPayload(1);
+                  spew("led params: %ums, %u%%", pulsew, dimming);
+                  setLedParams(pulsew, dimming);
+                }
+                  break;
+
+                default:
+                  war("Got not supported command");
+                }
+              }
+            }
+            m_parser.reset();
+
+            if (do_trigger and (n_frames > 0))
+            {
+              if (do_flash)
+                xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_EXPOSURE_PULSE);
+
+              getImages(n_frames);
 
               xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_OFF);
-            }
-            else if (m_bfr[1] == 'E' and rv >= 10)
-            {
-              m_args.exposure = byteFromHex(&m_bfr[6]);
-              spew("exposure: %u", m_args.exposure);
-              setExposure(m_args.exposure);
-            }
-            else if (m_bfr[1] == 'D' and rv >= 10)
-            {
-              m_args.data_format = byteFromHex(&m_bfr[6]);
-              spew("data_format: %u", m_args.data_format);
-              setDataFormat(m_args.data_format);
             }
           }
         }
