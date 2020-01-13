@@ -254,8 +254,10 @@ namespace Vision
       void
       setLedParams(unsigned int pulsew, unsigned int dimming)
       {
-        changeEntityParameter(m_args.flash_entity_name, "Pulse Duration", String::str("%u", pulsew));
-        changeEntityParameter(m_args.flash_entity_name, "Dimming Value", String::str("%u", dimming));
+        if (pulsew != 0)
+          changeEntityParameter(m_args.flash_entity_name, "Pulse Duration", String::str("%u", pulsew));
+        if (dimming != 0)
+          changeEntityParameter(m_args.flash_entity_name, "Dimming Value", String::str("%u", dimming));
       }
 
       void
