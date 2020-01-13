@@ -31,16 +31,18 @@
 
 // Vendor headers.
 #ifdef DUNE_OS_WINDOWS
+#include <xiApi.h>
 #include <xiapi_dng_store.h>
 #else
+#include <m3api/xiApi.h>
 #include <m3api/xiapi_dng_store.h>
 #endif
 
 // Local headers.
 #include "Parser.hpp"
 
-// Check error macro. It executes function. Print and throw error if result is not OK.
-#define XICE(func) {XI_RETURN stat = (func); if (XI_OK!=stat) {err("Error:%d returned from function:"#func"",stat);throw "Error";}}
+// Check error macro. It executes the function and prints an error if result is not OK.
+#define XICE(func) {m_status=(func); if (m_status!=XI_OK) {err("Function "#func" returned %d",m_status);}}
 
 namespace Vision
 {
@@ -66,10 +68,14 @@ namespace Vision
       // Configuration parameters.
       Arguments m_args;
 
+      //! Xiapi return status.
+      XI_RETURN m_status;
       //! Camera handle.
-      HANDLE xiH;
+      HANDLE m_xiH;
       //! Image buffer.
-      XI_IMG image;
+      XI_IMG m_image;
+      //! Image metadata.
+      XI_DNG_METADATA m_metadata;
 
       //! UDP socket.
       UDPSocket* m_sock;
@@ -94,7 +100,8 @@ namespace Vision
       //! @param[in] ctx context.
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Task(name, ctx),
-        xiH(NULL),
+        m_status(0),
+        m_xiH(NULL),
         m_sock(NULL),
         m_id(0),
         m_id_bm(0),
@@ -171,15 +178,9 @@ namespace Vision
         m_id_bm = 1 << (m_id - 1 + (m_id > c_max_id / 2 ? 2 : 0));
         debug("Camera Module ID bitmask is: %u", m_id_bm);
 
-        try
-        {
-          inf("Opening the camera...");
-          XICE(xiOpenDevice(0, &xiH));
-        }
-        catch(...)
-        {
-          throw RestartNeeded("Failed to connect to the camera", 10);
-        }
+        inf("Opening the camera...");
+        if (xiOpenDevice(0, &m_xiH) != XI_OK)
+          throw RestartNeeded("Failed to connect to the camera!", 10);
 
         m_sock = new DUNE::Network::UDPSocket();
         m_sock->setMulticastTTL(1);
@@ -192,32 +193,27 @@ namespace Vision
       void
       onResourceInitialization(void)
       {
-        try
-        {
-          setDataFormat(m_args.data_format);
-          setExposure(m_args.exposure);
-          std::string sys_name = getSystemName();
-          XICE(xiSetParamString(xiH, XI_PRM_DEVICE_USER_ID, (void*)sys_name.c_str(), (DWORD)sizeof(sys_name)));
+        setDataFormat(m_args.data_format);
+        setExposure(m_args.exposure);
+        std::string sys_name = getSystemName();
+        XICE(xiSetParamString(m_xiH, XI_PRM_DEVICE_USER_ID, (void*)sys_name.c_str(), (DWORD)sizeof(sys_name)));
 
-          memset(&image, 0, sizeof(image));
-          image.size = sizeof(XI_IMG);
-        }
-        catch(...)
-        {
-          throw RestartNeeded("Failed to initialize the camera", 10);
-        }
+        memset(&m_image, 0, sizeof(m_image));
+        m_image.size = sizeof(XI_IMG);
+
+        XICE(xidngInitMetadataStruct(&m_metadata));
 
         m_log_dir = m_ctx.dir_log / "Photos";
         if (!m_log_dir.exists())
           m_log_dir.create();
-      }
+     }
 
       //! Release resources.
       void
       onResourceRelease(void)
       {
-        if (xiH != NULL)
-          XICE(xiCloseDevice(xiH));
+        if (m_xiH != NULL)
+          XICE(xiCloseDevice(m_xiH));
 
         Memory::clear(m_sock);
       }
@@ -235,23 +231,23 @@ namespace Vision
         if (!(df == XI_RAW8 or df == XI_RAW16))
           return;
         inf("Setting data format to %u...", df);
-        XICE(xiSetParamInt(xiH, XI_PRM_IMAGE_DATA_FORMAT, df));
+        XICE(xiSetParamInt(m_xiH, XI_PRM_IMAGE_DATA_FORMAT, df));
       }
 
       void
       setExposure(unsigned int exposure)
       {
-        if (xiH == NULL)
+        if (m_xiH == NULL)
           return;
         if (exposure == 0)
         {
           inf("Activating AEAG...");
-          XICE(xiSetParamInt(xiH, XI_PRM_AEAG, XI_ON));
+          XICE(xiSetParamInt(m_xiH, XI_PRM_AEAG, XI_ON));
         }
         else
         {
           inf("Setting exposure time to %ums...", exposure);
-          XICE(xiSetParamInt(xiH, XI_PRM_EXPOSURE, exposure * 1000));
+          XICE(xiSetParamInt(m_xiH, XI_PRM_EXPOSURE, exposure * 1000));
         }
       }
 
@@ -267,22 +263,23 @@ namespace Vision
       {
         if (fr == 0)
         {
-          XICE(xiSetParamInt(xiH, XI_PRM_ACQ_TIMING_MODE, XI_ACQ_TIMING_MODE_FREE_RUN));
+          inf("Configuring camera fro free run...");
+          XICE(xiSetParamInt(m_xiH, XI_PRM_ACQ_TIMING_MODE, XI_ACQ_TIMING_MODE_FREE_RUN));
         }
         else
         {
-          XICE(xiSetParamInt(xiH, XI_PRM_ACQ_TIMING_MODE, XI_ACQ_TIMING_MODE_FRAME_RATE));
+          XICE(xiSetParamInt(m_xiH, XI_PRM_ACQ_TIMING_MODE, XI_ACQ_TIMING_MODE_FRAME_RATE));
 
           float min_fr = 0;
-          xiGetParamFloat(xiH, XI_PRM_FRAMERATE XI_PRM_INFO_MIN, &min_fr);
+          XICE(xiGetParamFloat(m_xiH, XI_PRM_FRAMERATE XI_PRM_INFO_MIN, &min_fr));
           float max_fr = 0;
-          xiGetParamFloat(xiH, XI_PRM_FRAMERATE XI_PRM_INFO_MAX, &max_fr);
+          XICE(xiGetParamFloat(m_xiH, XI_PRM_FRAMERATE XI_PRM_INFO_MAX, &max_fr));
 
           //! Set framerate in range [min_fr, max_fr].
           fr = std::min(std::max(fr, min_fr), max_fr);
           inf("Setting frame rate to %0.2f...", fr);
 
-          XICE(xiSetParamFloat(xiH, XI_PRM_FRAMERATE, fr));
+          XICE(xiSetParamFloat(m_xiH, XI_PRM_FRAMERATE, fr));
         }
 
       }
@@ -400,13 +397,14 @@ namespace Vision
             if (do_trigger and (n_frames > 0))
             {
               if (do_flash)
-                xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_EXPOSURE_PULSE);
+                XICE(xiSetParamInt(m_xiH, XI_PRM_GPO_MODE, XI_GPO_EXPOSURE_PULSE));
 
               getImages(n_frames);
               std::string reply = String::str("SV%02u\n", m_id);
               m_sock->write((const uint8_t*) reply.c_str(), reply.size(), m_server_addr, m_args.udp_port);
 
-              xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_OFF);
+              if (do_flash)
+                XICE(xiSetParamInt(m_xiH, XI_PRM_GPO_MODE, XI_GPO_OFF));
             }
           }
         }
@@ -420,22 +418,16 @@ namespace Vision
       getImages(const uint& count)
       {
         inf("Starting acquisition...");
-        XICE(xiStartAcquisition(xiH));
+        XICE(xiStartAcquisition(m_xiH));
 
         double t_start = Clock::getSinceEpoch();
         for (uint images = 0; images < count; images++)
         {
-          xiGetImage(xiH, 5000, &image); // getting next image from the camera opened
+          if (xiGetImage(m_xiH, 5000, &m_image) != XI_OK)
+            throw RestartNeeded("Failed to acquire the image!", 10);
 
-          XI_DNG_METADATA metadata;
-          try
-          {
-            xidngFillMetadataFromCameraParams(xiH, &metadata);
-          }
-          catch(...)
-          {
-            war("Failed to fill metadata.");
-          }
+          XICE(xidngFillMetadataFromCameraParams(m_xiH, &m_metadata));
+
           //! Use own timestamp for consistency
           double now = Clock::getSinceEpoch();
           uint64_t t_sec = trunc(now);
@@ -445,11 +437,11 @@ namespace Vision
               bdt.month, bdt.day, bdt.hour, bdt.minutes, bdt.seconds, t_usec);
 
           trace("Writing %s", file.c_str());
-          XICE(xidngStore(file.c_str(), &image, &metadata));
+          XICE(xidngStore(file.c_str(), &m_image, &m_metadata));
         }
         inf("Acquired %u images in %0.3fs", count, Clock::getSinceEpoch() - t_start);
         inf("Stopping acquisition...");
-        XICE(xiStopAcquisition(xiH));
+        XICE(xiStopAcquisition(m_xiH));
       }
 
       //! Main loop.
