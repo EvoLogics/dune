@@ -86,6 +86,9 @@ namespace Vision
       //! Command Parser.
       Parser m_parser;
 
+      //! Address of a server to send a reply.
+      Address m_server_addr;
+
       //! Constructor.
       //! @param[in] name task name.
       //! @param[in] ctx context.
@@ -320,15 +323,14 @@ namespace Vision
       void
       readCmd(const double& timeout)
       {
-        Address addr;
         uint16_t port;
 
         try
         {
           if (Poll::poll(*m_sock, timeout))
           {
-            size_t rv = m_sock->read(m_bfr, sizeof(m_bfr), &addr, &port);
-            spew("received %u bytes from %s:%u", (unsigned)rv, addr.c_str(), port);
+            size_t rv = m_sock->read(m_bfr, sizeof(m_bfr), &m_server_addr, &port);
+            spew("received %u bytes from %s:%u", (unsigned)rv, m_server_addr.c_str(), port);
 
             if (rv < 8 or m_bfr[0] != 'S' or m_bfr[rv - 2] != '/')
               return;
@@ -401,6 +403,8 @@ namespace Vision
                 xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_EXPOSURE_PULSE);
 
               getImages(n_frames);
+              std::string reply = String::str("SV%02u\n", m_id);
+              m_sock->write((const uint8_t*) reply.c_str(), reply.size(), m_server_addr, m_args.udp_port);
 
               xiSetParamInt(xiH, XI_PRM_GPO_MODE, XI_GPO_OFF);
             }
