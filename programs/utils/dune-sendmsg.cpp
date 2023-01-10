@@ -70,7 +70,7 @@ main(int argc, char** argv)
       fprintf(stdout, "       RestartSystem\n");
       fprintf(stdout, "  [S]: SaveEntityParameters, SetEntityParameters, SetLedBrightness, SetServoPosition,\n");
       fprintf(stdout, "       SetThrusterActuation, Sms, SoundSpeed\n");
-      fprintf(stdout, "  [T]: Target, TeleoperationDone, Temperature, TextMessage, TrexCommand\n");
+      fprintf(stdout, "  [T]: Target, TeleoperationDone, Temperature, TextMessage, TrexCommand, TriggerAction\n");
       fprintf(stdout, "  [U]: UASimulation\n");
       fprintf(stdout, "  [V]: VehicleCommand, VehicleMedium\n");
       return 1;
@@ -783,6 +783,14 @@ main(int argc, char** argv)
         tmsg->command = 1;
     else if (strcmp(argv[4], "ENABLE") == 0 || strcmp(argv[4], "2") == 0 )
         tmsg->command = 2;
+  }
+
+  if (strcmp(argv[3], "TriggerAction") == 0)
+  {
+    IMC::TriggerAction* tmsg = new IMC::TriggerAction;
+    msg = tmsg;
+    tmsg->event = atoi(argv[4]);
+    tmsg->act_id = atoi(argv[5]);
   }
 
   if (strcmp(argv[3], "UASimulation") == 0)
