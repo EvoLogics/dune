@@ -85,6 +85,12 @@ namespace DUNE
       joinImpl(void);
 
       void
+      setStackSize(size_t size);
+
+      size_t
+      getStackSize();
+
+      void
       setPriorityImpl(Scheduler::Policy policy, unsigned priority);
 
       unsigned

@@ -168,6 +168,24 @@ namespace DUNE
     }
 
     void
+    Thread::setStackSize(size_t size)
+    {
+#if defined(DUNE_SYS_HAS_PTHREAD)
+      pthread_attr_setstacksize(&m_attr, size);
+#endif
+    }
+
+    size_t
+    Thread::getStackSize()
+    {
+      size_t size {0U};
+#if defined(DUNE_SYS_HAS_PTHREAD)
+      pthread_attr_getstacksize(&m_attr, &size);
+#endif
+      return size;
+    }
+
+    void
     Thread::setPriorityImpl(Scheduler::Policy policy, unsigned a_priority)
     {
 #if defined(DUNE_SYS_HAS_PTHREAD)
