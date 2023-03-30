@@ -1,0 +1,137 @@
+#!/bin/bash
+
+# COLOR CODES
+
+RED="\033[31m"
+GREEN="\033[32m"
+YELLOW="\033[33m"
+BLUE="\033[34m"
+PURPLE="\033[35m"
+CYAN="\033[36m"
+
+# MODIFIERS
+
+BOLD="\033[1m"
+RESET="\033[0m"
+
+# LOG LEVEL STRINGS
+DEB_STR="DEBUG  "
+INF_STR="INFO   "
+WAR_STR="WARN   "
+ERR_STR="ERROR  "
+SUC_STR="SUCCESS"
+
+# ------ PRIVATE (DO NOT USE DIRECTLY IN YOUR SCRIPTS) ------ #
+
+# GLOBAL VARIABLES
+
+# _LOGGING_DATETIME:
+#   0    Do not add datetime information to log messages
+#   1    Add datetime information to log messages
+declare -i _LOGGING_DATETIME=0
+
+# _LOGGING_VERBOSITY:
+#   0    Quiet mode: Only output error messages
+#   1    Normal mode: Output error, warn, info, success messages
+#   2    Debug mode: Output all messages
+declare -i _LOGGING_VERBOSITY=1
+
+# STATUS LOG MESSAGE FUNCTIONS
+#   Used to generate log messages with a log level (info, error, etc...)
+
+log_status()
+{
+    DATETIME=""
+    if [[ ${_LOGGING_DATETIME} -eq 1 ]]; then
+        DATETIME="[$(date '+%Y-%m-%d,%H:%M:%S')] "
+    fi
+    printf "${DATETIME}${1}[%s] %s${RESET}\n" "${2}" "${3}"
+}
+
+log_status_bold()
+{
+    DATETIME=""
+    if [[ ${_LOGGING_DATETIME} -eq 1 ]]; then
+        DATETIME="[$(date '+%Y-%m-%d,%H:%M:%S')] "
+    fi
+    printf "${DATETIME}${BOLD}${1}[%s] %s${RESET}\n" "${2}" "${3}"
+}
+
+# ------ PUBLIC (USE DIRECTLY IN YOUR SCRIPTS) ------ #
+
+# SET/UNSET DATETIME
+
+set_logging_datetime()
+{
+    _LOGGING_DATETIME=1
+}
+
+unset_logging_datetime()
+{
+    _LOGGING_DATETIME=0
+}
+
+# SET VERBOSITY LEVEL
+
+set_logging_quiet()
+{
+    _LOGGING_VERBOSITY=0
+}
+
+set_logging_normal()
+{
+    _LOGGING_VERBOSITY=1
+}
+
+set_logging_debug()
+{
+    _LOGGING_VERBOSITY=2
+}
+
+# LOGGING FUNCTIONS
+
+log()
+{
+    printf "${RESET}%s\n" "${1}"
+}
+
+bold()
+{
+    printf "${BOLD}%s${RESET}\n" "${1}"
+}
+
+error()
+{
+    if [[ ${_LOGGING_VERBOSITY} -ge 0 ]]; then
+        log_status_bold "${RED}" "${ERR_STR}" "${1}"
+    fi
+}
+
+warn()
+{
+    if [[ ${_LOGGING_VERBOSITY} -ge 1 ]]; then
+        log_status_bold "${YELLOW}" "${WAR_STR}" "${1}"
+    fi
+}
+
+info()
+{
+    if [[ ${_LOGGING_VERBOSITY} -ge 1 ]]; then
+        log_status "" "${INF_STR}" "${1}"
+    fi
+}
+
+success()
+{
+    if [[ ${_LOGGING_VERBOSITY} -ge 1 ]]; then
+        log_status_bold "${GREEN}" "${SUC_STR}" "${1}"
+    fi
+}
+
+debug()
+{
+    if [[ ${_LOGGING_VERBOSITY} -ge 2 ]]; then
+        log_status "${CYAN}" "${DEB_STR}" "${1}"
+    fi
+}
+

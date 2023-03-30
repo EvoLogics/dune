@@ -1,0 +1,114 @@
+#!/bin/bash
+
+source "${BASH_SOURCE%/*}/logging"
+
+ask_proceed()
+{
+    read -p "Proceed? [Y/y to proceed] " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        info "Exiting on user request"
+        exit 0
+    fi
+}
+
+check_argument_not_empty()
+{
+    arg_name="${1}"
+    arg_value="${2}"
+    debug "Checking argument '${arg_name}' is set"
+    if [ -z "${arg_value}" ]; then
+        error "Argument '${arg_name}' must be set" && exit 1
+    fi
+}
+
+check_does_not_contain_character()
+{
+    variable="${1}"
+    character="${2}"
+    if [[ "${variable}" = *${character}* ]]; then
+        error "Illegal character '${character}' in '${variable}'" && exit 1
+    fi
+}
+
+check_dir_exists()
+{
+    dir="${1}"
+    debug "Checking directory '${dir}' exists"
+    if [ ! -d "${dir}" ]; then
+        error "Directory does not exist: ${dir}" && exit 1
+    fi
+}
+
+check_file_exists()
+{
+    file="${1}"
+    debug "Checking file '${file}' exists"
+    if [ ! -f "${file}" ]; then
+        error "File does not exist: ${file}" && exit 1
+    fi
+}
+
+check_file_has_extension()
+{
+    file="${1}"
+    extension="${2}"
+    debug "Checking file '${file}' has extension .${extension}"
+    if [[ "${file}" != *.${extension} ]]; then
+        error "File does not have .${extension} extension: ${file}" && exit 1
+    fi
+}
+
+check_is_absolute_path()
+{
+    path="${1}"
+    debug "Checking path '${path}' is an absolute path"
+    if [[ "${path}" != /* ]]; then
+        error "Path is not absolute: ${path}" && exit 1
+    fi
+}
+
+check_is_integer()
+{
+    variable="${1}"
+    debug "Checking variable '${variable}' is an integer"
+    if [[ "${variable}" =~ [^0-9]+$ ]]; then
+        error "Not an integer: ${variable}" && exit 1
+    fi
+}
+
+check_integer_in_range()
+{
+    variable="${1}"
+    lower="${2}"
+    upper="${3}"
+    debug "Checking integer '${variable}' is in range [${lower}; ${upper}]"
+    if [ "$1" -lt "${lower}" ] || [ "$1" -gt "${upper}" ]; then
+        error "Integer not in range [${lower}; ${upper}]: ${variable}" && exit 1
+    fi
+}
+
+check_is_valid_ip()
+{
+    ip_address="${1}"
+    debug "Checking '${ip_address}' is a valid IP address"
+    old_IFS="${IFS}"
+    IFS='.' read -ra IP_ADDR_ARRAY <<< "${ip_address}"
+    IFS="${old_IFS}"
+
+    debug "Checking ip address '${ip_address}' has correct format"
+    if [ ${#IP_ADDR_ARRAY[@]} != 4 ]; then
+        error "IP address has invalid format: ${ip_address}" && exit 1
+    fi
+
+    for i in "${IP_ADDR_ARRAY[@]}"; do
+        check_is_integer "${i}"
+        check_integer_in_range "${i}" 0 255
+    done
+}
+
+ensure_sudo()
+{
+    sudo echo "" &>/dev/null
+}
+
