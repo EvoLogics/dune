@@ -363,8 +363,11 @@ namespace DUNE
       //! Instruct task to update its run-time parameters.
       //! @param[in] act_deact if true this function will request
       //! activation/deactivation if the 'Active' parameter changed.
+      //! @param[in] config_load if true this function will handle that
+      //! the parameters have been updated from the configuration.
       void
-      updateParameters(bool act_deact = true);
+      updateParameters(bool act_deact = true, bool config_load = false);
+
 
       //! Write task parameters in XML format.
       //! @param[in] os output stream.
@@ -692,6 +695,20 @@ namespace DUNE
       //! function.
       virtual void
       onUpdateParameters(void)
+      { }
+
+      //! Called when the task's parameters have been loaded from
+      //! a configuration file. This callback is called after
+      //! the parameters have been updated.
+      virtual void
+      onParametersLoaded(void)
+      { }
+
+      //! Called when the task's parameters have been changed
+      //! during the task operation. This callback is called after
+      //! the parameters have been updated.
+      virtual void
+      onParametersChanged(void)
       { }
 
       //! Called when an external activation request is

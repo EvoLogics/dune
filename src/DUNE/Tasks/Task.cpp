@@ -209,7 +209,7 @@ namespace DUNE
     }
 
     void
-    Task::updateParameters(bool act_deact)
+    Task::updateParameters(bool act_deact, bool config_load)
     {
       if (m_entity->getLabel().empty())
         m_entity->setLabel(m_args.elabel);
@@ -228,6 +228,11 @@ namespace DUNE
         m_debug_level = DEBUG_LEVEL_NONE;
 
       onUpdateParameters();
+      if (config_load)
+        onParametersLoaded();
+      else
+        onParametersChanged();
+
 
       if (m_honours_active)
       {
@@ -394,7 +399,7 @@ namespace DUNE
 
           try
           {
-            updateParameters();
+            updateParameters(true, true);
           }
           catch (std::runtime_error& pe)
           {
@@ -697,7 +702,7 @@ namespace DUNE
           err(DTR("invalid parameter '%s'"), pitr->first.c_str());
       }
 
-      updateParameters(false);
+      updateParameters(false, true);
     }
   }
 }
