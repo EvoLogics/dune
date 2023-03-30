@@ -241,8 +241,8 @@ namespace Sensors
           add_to_errors("palette", toStr(settings.palette));
         if (!updateSetting("brightness", settings.brightness, &m_settings.brightness, brightness_setter, brightness_getter))
           add_to_errors("brightness", toStr(settings.brightness));
-        /* if (!updateSetting("AGC", settings.agc, &m_settings.agc, agc_setter, agc_getter)) */
-        /*   add_to_errors("AGC", toStr(settings.agc)); */
+        if (!updateSetting("AGC", settings.agc, &m_settings.agc, agc_setter, agc_getter))
+          add_to_errors("AGC", toStr(settings.agc));
         if (!updateSetting("video color mode", settings.vcm, &m_settings.vcm, vcm_setter, vcm_getter))
           add_to_errors("video color mode", toStr(settings.vcm));
         if (!updateSetting("invert image horizontally", settings.invert_hor, &m_settings.invert_hor, invert_hor_setter, invert_hor_getter))
