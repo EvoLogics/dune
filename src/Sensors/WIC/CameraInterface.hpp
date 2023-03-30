@@ -300,6 +300,23 @@ namespace Sensors
       }
 
       void
+      getCameraSettings()
+      {
+        CSS* css = m_camera->GetSettings();
+        checkCameraSettingsNotNull(css);
+
+        m_settings.agc = css->GetAGCType();
+        m_settings.brightness = css->GetBrightness();
+        m_settings.dod = css->GetCMOSBitDepth();
+        m_settings.ffc = css->GetFFCMode();
+        m_settings.invert_hor = css->GetInvertVideo();
+        m_settings.invert_ver = css->GetRevertVideo();
+        m_settings.palette = css->GetPalette();
+        m_settings.range = css->GetRangeMode();
+        m_settings.vcm = css->GetVideoColorMode();
+      }
+
+      void
       printCameraInformation()
       {
         CSS* css = m_camera->GetSettings();

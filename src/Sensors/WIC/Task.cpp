@@ -246,6 +246,7 @@ namespace Sensors
       void
       onResourceInitialization(void)
       {
+        m_camera_if.getCameraSettings();
         updateCameraSettings();
         m_camera_if.printCameraInformation();
 
