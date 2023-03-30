@@ -66,9 +66,9 @@ namespace Sensors
     constexpr char WIC_DOM_LVDS_BIT_DEPTH[]    = "LVDS Bit Depth";
 
     //! WIC Range Mode
-    constexpr char WIC_RANGE_LOW[]             = "Low (-25 to +150 degree Celsius)";
-    constexpr char WIC_RANGE_MIDDLE[]          = "Middle (-40 to +500 degree Celsius)";
-    constexpr char WIC_RANGE_HIGH[]            = "High (+400 to +1500 degree Celsius)";
+    constexpr char WIC_RANGE_LOW[]             = "Low";
+    constexpr char WIC_RANGE_MIDDLE[]          = "Middle";
+    constexpr char WIC_RANGE_HIGH[]            = "High";
 
     //! WIC FFC Mode
     constexpr char WIC_FFC_MANUAL[]            = "Manual";
