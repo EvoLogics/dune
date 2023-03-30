@@ -1,0 +1,22 @@
+#!/bin/bash
+
+source "${BASH_SOURCE%/*}/logging"
+
+# Declare dry run variable
+
+declare -i _EXECUTE=1
+
+set_dry_run()
+{
+    _EXECUTE=0
+}
+
+execute()
+{
+    cmd=${1}
+    debug "${cmd}"
+    if [[ ${_EXECUTE} -ne 0 ]]; then
+        eval "${cmd}"
+    fi
+}
+
