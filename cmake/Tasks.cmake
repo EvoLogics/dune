@@ -150,13 +150,7 @@ macro(dune_add_task root_folder task)
 endmacro(dune_add_task root_folder task)
 
 macro(dune_add_tasks root_folder)
-  # file(GLOB_RECURSE tasks RELATIVE ${root_folder} ${root_folder}/Task.cmake)
-  set (tasks "Sensors/WIC/Task.cmake"
-             "Transports/HTTP/Task.cmake"
-             "Transports/Logging/Task.cmake"
-             "Transports/TCP/Client/Task.cmake"
-             "Transports/UDP/Task.cmake"
-             )
+  file(GLOB_RECURSE tasks RELATIVE ${root_folder} ${root_folder}/Task.cmake)
   foreach(task ${tasks})
     dune_add_task(${root_folder} ${task})
   endforeach(task ${tasks})
@@ -175,8 +169,8 @@ if(TASK_FILE)
   endif()
 else(TASK_FILE)
   dune_add_tasks(${PROJECT_SOURCE_DIR}/src)
-  # dune_add_tasks(${PROJECT_SOURCE_DIR}/private/src)
-  # dune_add_tasks(${PROJECT_SOURCE_DIR}/user/src)
+  dune_add_tasks(${PROJECT_SOURCE_DIR}/private/src)
+  dune_add_tasks(${PROJECT_SOURCE_DIR}/user/src)
 endif(TASK_FILE)
 
 list(SORT DUNE_TASKS_ENABLED)
