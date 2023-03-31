@@ -1,6 +1,7 @@
 # WIC Integration Issues
 
-EvoLogics uses the [LSTS DUNE framework](https://github.com/LSTS/dune) for its autonomous devices.[^1]<br>
+EvoLogics uses the [LSTS DUNE framework](https://github.com/LSTS/dune) for its autonomous devices.<br>
+(See [DUNE Quickstart](DuneQuickstart.md) for a very short intro to DUNE.)<br>
 We are writing a DUNE driver for the Workswell WIC infrared camera.<br>
 
 The driver should:
@@ -10,7 +11,7 @@ The driver should:
 
 ## Issues
 
-Before continuing, please follow the [Setting Up](Setup.md) and [Compiling and Running](CompilingandRunning.md) guides.<br>
+Before continuing, please follow the [Setting Up](Setup.md) and [Compiling and Running](CompilingAndRunning.md) guides.<br>
 They explain how to create a working example of DUNE with the WIC driver, to which we can compare the non-working cases listed below.
 
 
@@ -115,8 +116,3 @@ This does not happen for other settings (FFC, Palette, Range, etc...).
 
  - Why is it not possible to set 16 bit CMOS bit depth?
 
----
-
-**Footnotes:**
-
-[^1]: See [DUNE Quickstart](DuneQuickstart.md) for a very short intro to DUNE.
