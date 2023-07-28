@@ -99,7 +99,7 @@
 #endif
 
 // BSD headers.
-#if defined(DUNE_SYS_HAS_SYS_SYSCTL_H)
+#if defined(DUNE_OS_BSD) && defined (DUNE_SYS_HAS_SYS_SYSCTL_H)
 #  include <sys/sysctl.h>
 #endif
 
