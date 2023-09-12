@@ -109,7 +109,9 @@ namespace Transports
             if (!Poll::poll(m_sock, poll_tout))
               continue;
 
-            uint16_t rv = m_sock.read(bfr, c_bfr_size, &addr);
+            uint16_t port;
+
+            uint16_t rv = m_sock.read(bfr, c_bfr_size, &addr, &port);
             IMC::Message* msg = IMC::Packet::deserialize(bfr, rv);
 
             if (m_lcomms->isActive())
@@ -131,6 +133,8 @@ namespace Transports
             m_contacts_lock.unlock();
 
             m_task.dispatch(msg, DF_KEEP_TIME | DF_KEEP_SRC_EID);
+
+            m_task.trace("received a message from %s:%u", addr.c_str(), (unsigned) port);
 
             if (m_trace)
               msg->toText(std::cerr);
