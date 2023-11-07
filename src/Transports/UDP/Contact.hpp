@@ -83,6 +83,12 @@ namespace Transports
         return !isInactive();
       }
 
+      std::string
+      generateService()
+      {
+        return String::str("imc+udp://%s:%u", m_addr.c_str(), m_port);
+      }
+
     private:
       // Node id.
       unsigned m_id;

@@ -84,6 +84,8 @@ namespace Transports
       bool only_local;
       // Optional custom service type
       std::string custom_service;
+      // Allow anonymous contacts.
+      bool allow_anonymous_contacts;
     };
 
     // Internal buffer size.
@@ -183,6 +185,10 @@ namespace Transports
         param("Custom Service Type", m_args.custom_service)
         .defaultValue("")
         .description("Optional custom service type (imc+udp+<Custom Service Type>), empty entry gives default service (imc+udp)");
+
+        param("Allow Anonymous Contacts", m_args.allow_anonymous_contacts)
+        .defaultValue("false")
+        .description("Add anonymous contacts, that is without received Announce, to the contact list");
 
         // Allocate space for internal buffer.
         m_bfr = new uint8_t[c_bfr_size];
@@ -397,6 +403,15 @@ namespace Transports
         for (; itr != contacts.end(); ++itr)
         {
           std::string name = resolveSystemId(itr->getId());
+
+          if (m_args.allow_anonymous_contacts)
+          {
+            if (name == "unknown")
+              name = String::str("anonymous-%u", itr->getId());
+
+            if (!m_node_table.hasNode(itr->getId()))
+              m_node_table.addNode(itr->getId(), name, itr->generateService());
+          }
 
           if (itr->isActive())
           {

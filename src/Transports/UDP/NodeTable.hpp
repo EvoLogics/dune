@@ -63,6 +63,12 @@ namespace Transports
       }
 
       bool
+      hasNode(unsigned id)
+      {
+        return m_table.find(id) != m_table.end();
+      }
+
+      bool
       activate(unsigned id, const Address& addr)
       {
         Table::iterator itr = m_table.find(id);
