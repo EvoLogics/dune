@@ -42,9 +42,10 @@ namespace Transports
     class Contact
     {
     public:
-      Contact(unsigned id, const Address& addr):
+      Contact(unsigned id, const Address& addr, uint16_t port):
         m_id(id),
-        m_addr(addr)
+        m_addr(addr),
+        m_port(port)
       { }
 
       void
@@ -71,6 +72,12 @@ namespace Transports
         return m_addr;
       }
 
+      uint16_t
+      getPort(void) const
+      {
+        return m_port;
+      }
+
       bool
       isInactive(void)
       {
@@ -94,6 +101,8 @@ namespace Transports
       unsigned m_id;
       // Node address.
       Address m_addr;
+      // Node port.
+      uint16_t m_port;
       // Counter to check if node is no longer reachable.
       Time::Counter<float> m_counter;
     };

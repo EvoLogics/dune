@@ -62,21 +62,21 @@ namespace Transports
       }
 
       void
-      update(unsigned id, const Address& addr)
+      update(unsigned id, const Address& addr, uint16_t port)
       {
         Table::iterator itr = m_table.find(id);
 
         if (itr == m_table.end())
         {
-          std::pair<Table::iterator, bool> rv = m_table.insert(Entry(id, Contact(id, addr)));
+          std::pair<Table::iterator, bool> rv = m_table.insert(Entry(id, Contact(id, addr, port)));
           itr = rv.first;
           itr->second.setTimeout(m_tout);
         }
 
-        // Address has changed... update it.
-        if (itr->second.getAddress() != addr)
+        // Address/port has changed... update it.
+        if (itr->second.getAddress() != addr || itr->second.getPort() != port)
         {
-          itr->second = Contact(id, addr);
+          itr->second = Contact(id, addr, port);
           itr->second.setTimeout(m_tout);
         }
 
