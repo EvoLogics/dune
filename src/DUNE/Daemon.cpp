@@ -217,11 +217,7 @@ namespace DUNE
   void
   Daemon::consume(const IMC::RestartSystem* msg)
   {
-    if (msg -> type == IMC::RestartSystem::RSTYPE_SYSTEM)
-    {
-      call_reboot = true;
-      inf(DTR("Got message to reboot system"));
-    }
+    (void)msg;
     stop();
   }
 
