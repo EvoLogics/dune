@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 0f425402b735f36a64d579da7bb4baf3                            *
+// IMC XML MD5: fd9c1abe58cae4aa57c67c98fe42890f                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_SUPERTYPES_HPP_INCLUDED_
@@ -48,11 +48,6 @@ namespace DUNE
 
     //! Super type Control Command.
     class ControlCommand: public Message
-    {
-    };
-
-    //! Super type RemoteData.
-    class RemoteData: public Message
     {
     };
   }
