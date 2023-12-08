@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -43,6 +43,8 @@
 #include <DUNE/Tasks/Exceptions.hpp>
 #include <DUNE/Tasks/Task.hpp>
 #include <DUNE/Utils/XML.hpp>
+#include <DUNE/Entities/BasicEntity.hpp>
+#include <DUNE/Entities/EntityUtils.hpp>
 
 #if defined(DUNE_OS_LINUX)
 #  include <sys/prctl.h>
@@ -107,6 +109,16 @@ namespace DUNE
 
       m_entities.push_back(e);
       return e->getId();
+    }
+
+    Entities::BasicEntity*
+    Task::getLocalEntity(const std::string& label)
+    {
+      std::vector<Entities::BasicEntity*>::iterator it = std::find(m_entities.begin(), m_entities.end(), label);
+      if (it == m_entities.end())
+          return NULL;
+      else
+        return (*it);
     }
 
     void
@@ -243,6 +255,7 @@ namespace DUNE
         {
           if (paramChanged(m_args.active))
           {
+            war("due to params active change, requesting %s", m_args.active ? "activation" : "deactivation");
             if (m_args.active)
               requestActivation();
             else
@@ -262,9 +275,8 @@ namespace DUNE
     Task::requestActivation(void)
     {
       spew("request activation");
-      m_entity->requestActivation();
 
-      if (m_entity->isActivating())
+      if (m_entity->requestActivation())
       {
         spew("calling on request activation");
         onRequestActivation();
@@ -287,14 +299,20 @@ namespace DUNE
 
       m_entity->succeedActivation();
       if (m_entity->hasPendingDeactivation())
+      {
+        spew("has pending deactivation");
         requestDeactivation();
+      }
     }
 
     void
     Task::activationFailed(const std::string& reason)
     {
       spew("activation failed: %s", reason.c_str());
-      m_args.active = false;
+      
+      if (m_honours_active)
+        m_params.set("Active", "false");
+
       m_entity->failActivation(reason);
     }
 
@@ -302,9 +320,8 @@ namespace DUNE
     Task::requestDeactivation(void)
     {
       spew("request deactivation");
-      m_entity->requestDeactivation();
 
-      if (m_entity->isDeactivating())
+      if (m_entity->requestDeactivation())
       {
         spew("calling on request deactivation");
         onRequestDeactivation();
@@ -327,7 +344,10 @@ namespace DUNE
 
       m_entity->succeedDeactivation();
       if (m_entity->hasPendingActivation())
+      {
+        spew("has pending activation");
         requestActivation();
+      }
     }
 
     void
@@ -471,6 +491,7 @@ namespace DUNE
         try
         {
           m_params.set((*itr)->name, (*itr)->value);
+          m_ctx.config.set(getName(), (*itr)->name, (*itr)->value);
         }
         catch (std::runtime_error& e)
         {
@@ -693,11 +714,24 @@ namespace DUNE
         if (pitr->first == "Enabled")
           continue;
 
+        // Ignore Supervisors.Delegator sections
+        std::string section = getName();
+        std::string::size_type p = section.find('/');
+        if(!std::strcmp(section.substr(0,p).c_str(),"Supervisors.Delegator"))
+          continue;
+
         if (m_params.find(pitr->first) == m_params.end())
           err(DTR("invalid parameter '%s'"), pitr->first.c_str());
       }
 
-      updateParameters(false);
+      try
+      {
+        updateParameters(false);
+      }
+      catch (RestartNeeded& e)
+      {
+        err(DTR("unable to load parameters: %s"), e.getError());
+      }
     }
   }
 }

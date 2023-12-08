@@ -1,5 +1,5 @@
 ############################################################################
-# Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      #
+# Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      #
 # Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  #
 ############################################################################
 # This file is part of DUNE: Unified Navigation Environment.               #
@@ -28,11 +28,16 @@
 ############################################################################
 
 # Validate CMake version.
-cmake_minimum_required(VERSION 2.6.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
 if(COMMAND CMAKE_POLICY)
   cmake_policy(SET CMP0003 NEW)
 endif(COMMAND CMAKE_POLICY)
+
+# Required C++ Standard.
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(cmake/Toolchain.cmake)
 
@@ -43,10 +48,10 @@ project("DUNE")
 set(PROJECT_NAME "DUNE: Unified Navigation Environment")
 set(PROJECT_SHORT_NAME "DUNE")
 set(PROJECT_VENDOR "Universidade do Porto - LSTS")
-set(PROJECT_COPYRIGHT "Copyright (C) 2007-2017 - ${PROJECT_VENDOR}")
+set(PROJECT_COPYRIGHT "Copyright (C) 2007-2023 - ${PROJECT_VENDOR}")
 set(PROJECT_CONTACT "DUNE <dune@lsts.pt>")
-set(PROJECT_VERSION_YEAR  "2017")
-set(PROJECT_VERSION_MONTH "01")
+set(PROJECT_VERSION_YEAR  "2022")
+set(PROJECT_VERSION_MONTH "04")
 set(PROJECT_VERSION_PATCH "0")
 set(PROJECT_VERSION_RCN   "0")
 
@@ -88,8 +93,12 @@ dune_option(JS "Enable support for SpiderMonkey javascript engine")
 dune_option(XENETH "Enable support for the Xeneth SDK")
 dune_option(BLUEVIEW "Enable support for the BlueView SDK")
 dune_option(OPENCV "Enable support for OpenCV")
+dune_option(POINTGREY "Enable support for POINTGREY")
+dune_option(EXIV2 "Enable support for Exiv2")
 dune_option(NO_RTTI "Disable support for RTTI")
 dune_option(UEYE "Enable support for IDS uEye cameras")
+dune_option(H5CPP "Enable support for hdf5 format i/o using the h5cpp library")
+dune_option(ELLIPSOIDAL "Enable ellipsoidal coordinates in (WGS84) displace")
 
 # Internationalization.
 include(${PROJECT_SOURCE_DIR}/cmake/I18N.cmake)
@@ -159,6 +168,10 @@ file(GLOB_RECURSE DUNE_CORE_HEADERS "${PROJECT_SOURCE_DIR}/src/DUNE/*.hpp"
 file(GLOB_RECURSE DUNE_CORE_DEFS    "${PROJECT_SOURCE_DIR}/src/DUNE/*.def")
 string(REPLACE ";" " " DUNE_CORE_HEADERS_STRING "${DUNE_CORE_HEADERS}")
 
+file(GLOB_RECURSE USER_CORE_SOURCES "${PROJECT_SOURCE_DIR}/user*/src/USER/*.cpp")
+file(GLOB_RECURSE USER_CORE_HEADERS "${PROJECT_SOURCE_DIR}/user*/src/USER/*.hpp")
+string(REPLACE ";" " " USER_CORE_HEADERS_STRING "${USER_CORE_HEADERS}")
+
 configure_file(${PROJECT_SOURCE_DIR}/src/DUNE/Config.hpp.in
   ${DUNE_GENERATED}/src/DUNE/Config.hpp)
 
@@ -167,7 +180,7 @@ install(FILES ${DUNE_GENERATED}/src/DUNE/Config.hpp
 
 include(${PROJECT_SOURCE_DIR}/cmake/Version.cmake)
 
-set_source_files_properties(${DUNE_CORE_SOURCES}
+set_source_files_properties(${DUNE_CORE_SOURCES} ${USER_CORE_SOURCES}
   PROPERTIES COMPILE_FLAGS "${DUNE_CXX_FLAGS} ${DUNE_CXX_FLAGS_STRICT}")
 
 if(DUNE_OS_WINDOWS)
@@ -178,7 +191,7 @@ if(DUNE_OS_WINDOWS)
     ${DUNE_GENERATED}/src/DUNE/Version.rc)
 endif(DUNE_OS_WINDOWS)
 
-foreach(header ${DUNE_CORE_HEADERS})
+foreach(header ${DUNE_CORE_HEADERS} ${USER_CORE_HEADERS})
   string(REGEX REPLACE "${PROJECT_SOURCE_DIR}/" "" header ${header})
   string(REGEX REPLACE "src" "include" destination ${header})
   get_filename_component(destination ${destination} PATH)
@@ -192,29 +205,31 @@ foreach(extlib ${extlibs})
 endforeach(extlib ${extlibs})
 
 # Private Libraries.
-file(GLOB extlibs ${PROJECT_SOURCE_DIR}/private/vendor/libraries/*/Library.cmake)
+file(GLOB extlibs ${PROJECT_SOURCE_DIR}/private*/vendor/libraries/*/Library.cmake)
 foreach(extlib ${extlibs})
   include(${extlib})
 endforeach(extlib ${extlibs})
 
 # User Libraries.
-file(GLOB extlibs ${PROJECT_SOURCE_DIR}/user/vendor/libraries/*/Library.cmake)
+file(GLOB extlibs ${PROJECT_SOURCE_DIR}/user*/vendor/libraries/*/Library.cmake)
 foreach(extlib ${extlibs})
   include(${extlib})
 endforeach(extlib ${extlibs})
 
-include_directories(${DUNE_GENERATED}/src ${PROJECT_SOURCE_DIR}/src ${DUNE_VENDOR_INCS_DIR})
+file(GLOB DUNE_SOURCE_USER ${PROJECT_SOURCE_DIR}/user*/src)
+include_directories(${DUNE_GENERATED}/src ${PROJECT_SOURCE_DIR}/src ${DUNE_SOURCE_USER} ${DUNE_VENDOR_INCS_DIR})
 link_directories(${DUNE_VENDOR_LIBS_DIR})
 set(DUNE_CORE_FILES ${DUNE_CORE_SOURCES} ${DUNE_VENDOR_FILES})
+set(USER_CORE_FILES ${USER_CORE_SOURCES} ${USER_VENDOR_FILES})
 
 if(DUNE_SHARED)
   message(STATUS "Building shared library")
-  add_library(dune-core SHARED ${DUNE_CORE_FILES})
+  add_library(dune-core SHARED ${DUNE_CORE_FILES} ${USER_CORE_FILES} )
   set_target_properties(dune-core PROPERTIES DEFINE_SYMBOL DUNE_DLL_EXPORT)
   target_link_libraries(dune-core ${DUNE_SYS_LIBS})
 else(DUNE_SHARED)
   message(STATUS "Building static library")
-  add_library(dune-core STATIC ${DUNE_CORE_FILES})
+  add_library(dune-core STATIC ${DUNE_CORE_FILES} ${USER_CORE_FILES} )
   if(DUNE_CXX_MICROSOFT AND DUNE_CPU_X86)
     if(DUNE_CPU_32B)
       set_target_properties(dune-core PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x86")
@@ -225,6 +240,11 @@ else(DUNE_SHARED)
 endif(DUNE_SHARED)
 
 add_dependencies(dune-core dune-version)
+
+# WGS84 Coordinate Type
+if(ELLIPSOIDAL)
+  add_definitions(-DDUNE_ELLIPSOIDAL_DISPLACE)
+endif(ELLIPSOIDAL)
 
 ##########################################################################
 #                          Tasks                                         #
@@ -324,6 +344,11 @@ install(DIRECTORY www DESTINATION .)
 
 # Install configuration files.
 install(DIRECTORY etc DESTINATION .)
+
+if(EXISTS "${PROJECT_SOURCE_DIR}/private/etc/")
+  # Install private configuration files.
+  install(DIRECTORY private/etc DESTINATION ./private/)
+endif(EXISTS "${PROJECT_SOURCE_DIR}/private/etc/")
 
 if(EXISTS "${PROJECT_SOURCE_DIR}/user/etc/")
   # Install user configuration files.

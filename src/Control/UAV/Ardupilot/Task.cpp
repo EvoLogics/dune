@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -28,6 +28,7 @@
 // Author: Eduardo Marques                                                  *
 // Author: Ricardo Martins                                                  *
 // Author: Joao Fortuna                                                     *
+// Author: Maria Costa                                                      *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -136,7 +137,7 @@ namespace Control
         //! Has Power Module
         bool pwrm;
         //! WP seconds before reach
-        int secs;
+        float secs;
         //! WP Copter: Minimum wp switch radius
         float cp_wp_radius;
         //! RC setup
@@ -150,10 +151,14 @@ namespace Control
         std::string form_fl_ent;
         //! Convert MSL to WGS84 height
         bool convert_msl;
+        //! Default pitch angle for automatic takeoff
+        float takeoff_pitch;
         //! Enter loiter mode when in idle
         bool loiter_idle;
         //! Dispatch ExternalNavData rather than EstimatedState
         bool use_external_nav;
+        //! Temperature of ESC failure (degrees)
+        float esc_temp;
       };
 
       struct Task: public DUNE::Tasks::Task
@@ -201,6 +206,8 @@ namespace Control
         bool m_reboot;
         //! Flag indicating MSL-WGS84 offset has already been calculated.
         bool m_offset_st;
+        //! WGS84 height on ground
+        float m_href;
         //! External control
         bool m_external;
         //! Current waypoint
@@ -232,6 +239,8 @@ namespace Control
         std::queue<mavlink_message_t> m_mission_items;
         //! Desired gimbal angles
         float m_gb_pan, m_gb_tilt, m_gb_retract;
+        //! Flag to signal if a land maneuver occured
+        bool m_land;
 
         Task(const std::string& name, Tasks::Context& ctx):
           Tasks::Task(name, ctx),
@@ -243,6 +252,7 @@ namespace Control
           m_hae_offset(0.0),
           m_reboot(true),
           m_offset_st(false),
+          m_href(0),
           m_external(true),
           m_current_wp(0),
           m_critical(false),
@@ -260,7 +270,8 @@ namespace Control
           m_dspeed(20),
           m_vehicle_type(VEHICLE_UNKNOWN),
           m_service(false),
-          m_last_wp(0)
+          m_last_wp(0),
+          m_land(false)
         {
           param("Communications Timeout", m_args.comm_timeout)
           .minimumValue("1")
@@ -284,7 +295,7 @@ namespace Control
           .description("Address for connection to Ardupilot");
 
           param("IPv4 - Address", m_args.ip)
-          .defaultValue("")
+          .defaultValue("0.0.0.0")
           .description("Address for neptus connection to Ardupilot");
 
           param("Telemetry Rate", m_args.trate)
@@ -298,7 +309,7 @@ namespace Control
           .description("Altitude to be used if desired Z has no units");
 
           param("Default loiter radius", m_args.lradius)
-          .defaultValue("-150.0")
+          .defaultValue("-100.0")
           .units(Units::Meter)
           .description("Loiter radius used in LoiterHere (idle)");
 
@@ -401,6 +412,10 @@ namespace Control
           .defaultValue("false")
           .description("Convert altitude extracted from the Ardupilot to WGS84 height");
 
+          param("Takeoff Pitch", m_args.takeoff_pitch)
+          .defaultValue("13")
+          .description("Default pitch angle for automatic takeoff, in degrees.");
+
           param("Loiter in Idle", m_args.loiter_idle)
           .defaultValue("true")
           .description("Loiter when in idle.");
@@ -408,6 +423,10 @@ namespace Control
           param("Use External Nav Data", m_args.use_external_nav)
           .defaultValue("false")
           .description("Dispatch ExternalNavData instead of EstimatedState");
+
+          param("Temperature of ESC failure (degrees)", m_args.esc_temp)
+          .defaultValue("70.0")
+          .description("Temperature of ESC failure (degrees).");
 
           // Setup packet handlers
           // IMPORTANT: set up function to handle each type of MAVLINK packet here
@@ -419,7 +438,7 @@ namespace Control
           m_mlh[MAVLINK_MSG_ID_WIND] = &Task::handleWindPacket;
           m_mlh[MAVLINK_MSG_ID_COMMAND_ACK] = &Task::handleCmdAckPacket;
           m_mlh[MAVLINK_MSG_ID_MISSION_ACK] = &Task::handleMissionAckPacket;
-          m_mlh[MAVLINK_MSG_ID_MISSION_CURRENT] = &Task::handleMissionCurrentPacket;
+          //m_mlh[MAVLINK_MSG_ID_MISSION_CURRENT] = &Task::handleMissionCurrentPacket;
           m_mlh[MAVLINK_MSG_ID_STATUSTEXT] = &Task::handleStatusTextPacket;
           m_mlh[MAVLINK_MSG_ID_HEARTBEAT] = &Task::handleHeartbeatPacket;
           m_mlh[MAVLINK_MSG_ID_NAV_CONTROLLER_OUTPUT] = &Task::handleNavControllerPacket;
@@ -427,7 +446,7 @@ namespace Control
           m_mlh[MAVLINK_MSG_ID_SYS_STATUS] = &Task::handleSystemStatusPacket;
           m_mlh[MAVLINK_MSG_ID_VFR_HUD] = &Task::handleHUDPacket;
           m_mlh[MAVLINK_MSG_ID_SYSTEM_TIME] = &Task::handleSystemTimePacket;
-          m_mlh[MAVLINK_MSG_ID_MISSION_REQUEST] = &Task::handleMissionRequestPacket;
+          //m_mlh[MAVLINK_MSG_ID_MISSION_REQUEST] = &Task::handleMissionRequestPacket;
           m_mlh[MAVLINK_MSG_ID_RAW_IMU] = &Task::handleImuRaw;
 
           // Setup processing of IMC messages
@@ -444,6 +463,8 @@ namespace Control
           bind<SimulatedState>(this);
           bind<DevCalibrationControl>(this);
           bind<AutopilotMode>(this);
+          bind<Takeoff>(this);
+          bind<Land>(this);
 
           //! Misc. initialization
           m_last_pkt_time = 0; //! time of last packet from Ardupilot
@@ -489,6 +510,12 @@ namespace Control
             m_TCP_sock->setNoDelay(true);
             setupRate(m_args.trate);
             inf(DTR("Ardupilot interface initialized"));
+
+            // Clear previous mission on autopilot
+            mavlink_msg_mission_clear_all_pack(255, 0, &m_msg, m_sysid, 0);
+            uint16_t n = mavlink_msg_to_send_buffer(m_buf, &m_msg);
+            sendData(m_buf, n);
+            debug("Cleared mission in ardupilot.");
           }
           catch (...)
           {
@@ -626,10 +653,7 @@ namespace Control
             }
 
             if (!(m_args.ardu_tracker) && (cloops->mask & IMC::CL_ROLL))
-            {
-              onUpdateParameters();
               activateFBW();
-            }
           }
           else
           {
@@ -774,14 +798,14 @@ namespace Control
           {
             // Copters must first be set to guided as of AC 3.2
             uint8_t buf[512];
-            mavlink_message_t* msg = new mavlink_message_t;
+            mavlink_message_t msg;
 
-            mavlink_msg_set_mode_pack(255, 0, msg,
+            mavlink_msg_set_mode_pack(255, 0, &msg,
                                       m_sysid,
                                       1,
                                       CP_MODE_GUIDED);
 
-            uint16_t n = mavlink_msg_to_send_buffer(buf, msg);
+            uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
             sendData(buf, n);
             debug("Guided MODE on ardupilot is set");
           }
@@ -901,50 +925,29 @@ namespace Control
             return;
           }
 
-          //! In Auto mode but still in ground, performing takeoff first
+          //! In Auto mode but still in ground - warns operator to add takeoff to the plan.
           if (m_ground)
           {
-
-            inf(DTR("ArduPilot in Auto mode but still in ground, performing takeoff first."));
-            if (m_vehicle_type == VEHICLE_COPTER)
-            {
-              takeoff_copter(path);
-            }
-            else {
-              takeoff_plane(path);
-            }
+            war(DTR("ArduPilot in Auto mode, but still in ground! Add a takeoff waypoint to the plan."));
             return;
           }
 
           uint8_t buf[512];
           mavlink_message_t msg;
+          uint16_t n;
 
-          if(m_vehicle_type == VEHICLE_COPTER)
+          if (!((m_mode == CP_MODE_GUIDED) || (m_mode == PL_MODE_GUIDED)))
           {
             // Copters must first be set to guided as of AC 3.2
-            // Disabled, as this is not
-
-            mavlink_msg_set_mode_pack(255, 0, &msg,
-                                      m_sysid,
-                                      1,
-                                      CP_MODE_GUIDED); //! DUNE mode on arducopter is 12
-
-            uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
-            sendData(buf, n);
-            debug("Guided MODE on ardupilot is set");
-          }
-
-          if(m_vehicle_type == VEHICLE_FIXEDWING)
-          {
             // Planes must first be set to guided as of AP 3.3.0
+            uint8_t mode = (m_vehicle_type == VEHICLE_COPTER) ? (uint8_t)CP_MODE_GUIDED : (uint8_t)PL_MODE_GUIDED;
             mavlink_msg_set_mode_pack(255, 0, &msg,
                                       m_sysid,
                                       1,
-                                      PL_MODE_GUIDED);
-
-            uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
+                                      mode);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
             sendData(buf, n);
-            debug("Guided MODE on ardupilot is set");
+            debug("Guided MODE on ardupilot is set.");
           }
 
           //! Setting airspeed parameter
@@ -966,7 +969,7 @@ namespace Control
                                      (int)(path->speed * 100), //! Parameter value
                                      MAV_PARAM_TYPE_INT16); //! Parameter type
           }
-          int n = mavlink_msg_to_send_buffer(buf, &msg);
+          n = mavlink_msg_to_send_buffer(buf, &msg);
           sendData(buf, n);
 
           //! Setting loiter radius parameter
@@ -987,7 +990,6 @@ namespace Control
           float alt = (path->end_z_units & IMC::Z_NONE) ? m_args.alt : (float)path->end_z;
 
           //! Destination
-
           if (m_vehicle_type == VEHICLE_COPTER)
           {
             mavlink_msg_mission_item_pack(255, 0, &msg,
@@ -1053,148 +1055,133 @@ namespace Control
         }
 
         void
-        takeoff_copter(const IMC::DesiredPath* dpath)
+        consume(const IMC::Takeoff* tkoff)
         {
-          /* As of AC 3.1, we can now send takeoff as a guided command. */
-          // We need to be in guided for this to work.
+          IMC::DesiredPath path;
 
-          // Altitude in WGS84
-          float alt = (dpath->end_z_units & IMC::Z_NONE) ? m_args.alt : (float) dpath->end_z;
+          path.start_lat = m_lat;
+          path.start_lon = m_lon;
+          path.start_z = getHeight();
+          path.start_z_units = IMC::Z_HEIGHT;
 
-          // Convert altitude to geoid height (MSL).
-          sendCommandPacket(MAV_CMD_NAV_TAKEOFF, 0, 0, 0, 0, 0, 0, alt - m_hae_offset);
+          path.end_lat = tkoff->lat;
+          path.end_lon = tkoff->lon;
+          path.end_z = tkoff->z;
+          path.end_z_units = tkoff->z_units;
 
-          m_pcs.start_lat = m_lat;
-          m_pcs.start_lon = m_lon;
-          m_pcs.start_z = getHeight();
-          m_pcs.start_z_units = IMC::Z_HEIGHT;
-
-          m_pcs.end_lat = dpath->end_lat;
-          m_pcs.end_lon = dpath->end_lon;
-
-          m_pcs.end_z = alt;
-          m_pcs.end_z_units = IMC::Z_HEIGHT;
-          m_pcs.flags = PathControlState::FL_3DTRACK | PathControlState::FL_CCLOCKW;
-          m_pcs.flags &= dpath->flags;
-          m_pcs.lradius = dpath->lradius;
-          m_pcs.path_ref = dpath->path_ref;
-
-          dispatch(m_pcs);
-
-          debug("Takeoff command sent to Ardupilot");
+          // Trigger automatic takeoff
+          (m_vehicle_type == VEHICLE_COPTER) ? autoTakeoff(&path, 0) : autoTakeoff(&path, tkoff->takeoff_pitch);
         }
 
         void
-        takeoff_plane(const IMC::DesiredPath* dpath)
+        consume(const IMC::Land* land)
         {
-          uint8_t buf[512];
-          int seq = 1;
+          if(!(m_dpath.flags & IMC::DesiredPath::FL_LAND))
+          {
+            debug("\n\r Land consume: doesn't have order to issue command yet!");
+            return;
+          }
 
+          // Trigger automatic landing
+          autoLand(land);
+        }
+
+        void
+        autoTakeoff(const IMC::DesiredPath* dpath, float pitch)
+        {
+          // Local variables
+          uint8_t buf[512], mode;
+          uint16_t n;
           mavlink_message_t msg;
 
-          mavlink_msg_param_set_pack(255, 0, &msg,
-                                     m_sysid, //! target_system System ID
-                                     0, //! target_component Component ID
-                                     "WP_LOITER_RAD", //! Parameter name
-                                     dpath->flags & DesiredPath::FL_CCLOCKW ? (-1 * dpath->lradius) : (dpath->lradius), //! Parameter value
-                                     MAV_PARAM_TYPE_INT16); //! Parameter type
-
-          uint16_t n = mavlink_msg_to_send_buffer(buf, &msg);
-          sendData(buf, n);
-
-          mavlink_msg_param_set_pack(255, 0, &msg,
-                                     m_sysid, //! target_system System ID
-                                     0, //! target_component Component ID
-                                     "TRIM_ARSPD_CM", //! Parameter name
-                                     (int)(dpath->speed * 100), //! Parameter value
-                                     MAV_PARAM_TYPE_INT16); //! Parameter type
-
+          // Clear previous mission on autopilot
+          mavlink_msg_mission_clear_all_pack(255, 0, &msg, m_sysid, 0);
           n = mavlink_msg_to_send_buffer(buf, &msg);
           sendData(buf, n);
+          debug("Cleared mission in ardupilot.");
 
-          mavlink_msg_mission_count_pack(255, 0, &msg,
-                                         m_sysid, //! target_system System ID
-                                         0, //! target_component Component ID
-                                         4); //! size of Mission
+          // Check if in manual mode
+          if (m_external)
+          {
+            m_dpath = *dpath;
+            inf(DTR("ArduPilot is in Manual mode, saving desired path."));
+            return;
+          }
 
+          // Set mode GUIDED.
+          mode = (m_vehicle_type == VEHICLE_COPTER) ? (uint8_t)CP_MODE_GUIDED : (uint8_t)PL_MODE_GUIDED;
+          mavlink_msg_set_mode_pack(255, 0, &msg,
+                                    m_sysid,
+                                    1,
+                                    mode);
           n = mavlink_msg_to_send_buffer(buf, &msg);
           sendData(buf, n);
+          debug("Guided MODE on ardupilot is set.");
 
-          mavlink_msg_mission_write_partial_list_pack(255, 0, &msg,
-                                                      m_sysid, //! target_system System ID
-                                                      0, //! target_component Component ID
-                                                      seq, //! start_index Start index, 0 by default and smaller / equal to the largest index of the current onboard list
-                                                      seq+2); //! end_index End index, equal or greater than start index
+          // Send takeoff command to ardupilot
+          if (m_vehicle_type == VEHICLE_COPTER)
+            sendCommandPacket(MAV_CMD_NAV_TAKEOFF, (float)Angles::degrees(pitch), 0, 0, 0, 0, 0, dpath->end_z - m_href);
+          else
+          {
+            // Send Mission Count
+            mavlink_msg_mission_count_pack(255, 0, &msg, m_sysid, 0, 2);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
 
-          m_mission_items.push(msg);
+            // Send Write Partial List
+            mavlink_msg_mission_write_partial_list_pack(255, 0, &msg, m_sysid, 0, 1, 1);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
 
-          sendMissionItem(false);
+            // Set Home as current position
+            mavlink_msg_mission_item_pack(255, 0, &msg,
+                                          m_sysid, //! target_system System ID
+                                          0, //! target_component Component ID
+                                          0, //! seq Sequence
+                                          MAV_FRAME_GLOBAL,    //! frame The coordinate system of the MISSION. see MAV_FRAME in mavlink_types.h
+                                          MAV_CMD_DO_SET_HOME, //! command The scheduled action for the MISSION. see MAV_CMD in ardupilotmega.h
+                                          0, //! current false:0, true:1, guided mode:2
+                                          0, //! autocontinue to next wp
+                                          1, //! Location: current=1, specificed=0
+                                          0, //! Not used
+                                          0, //! Not used
+                                          0, //! Not used
+                                          0, //! Latitude
+                                          0, //! Longitude
+                                          0);//! z PARAM7 / z position: global: altitude
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
 
-          //! Current position
-          mavlink_msg_mission_item_pack(255, 0, &msg,
-                                        m_sysid, //! target_system System ID
-                                        0, //! target_component Component ID
-                                        seq++, //! seq Sequence
-                                        MAV_FRAME_GLOBAL, //! frame The coordinate system of the MISSION. see MAV_FRAME in mavlink_types.h
-                                        MAV_CMD_NAV_TAKEOFF, //! command The scheduled action for the MISSION. see MAV_CMD in ardupilotmega.h
-                                        1, //! current false:0, true:1
-                                        1, //! autocontinue autocontinue to next wp
-                                        5, //! Pitch
-                                        0, //! Altitude
-                                        0, //! Not used
-                                        0, //! Not used
-                                        0, //! x PARAM5 / local: x position, global: latitude
-                                        0, //! y PARAM6 / y position: global: longitude
-                                        m_hae_msl + 10);//! z PARAM7 / z position: global: altitude
+            // Send Mission Item
+            mavlink_msg_mission_item_pack(255, 0, &msg,
+                                          m_sysid, //! target_system System ID
+                                          0, //! target_component Component ID
+                                          1, //! seq Sequence
+                                          MAV_FRAME_GLOBAL,    //! frame The coordinate system of the MISSION. see MAV_FRAME in mavlink_types.h
+                                          MAV_CMD_NAV_TAKEOFF, //! command The scheduled action for the MISSION. see MAV_CMD in ardupilotmega.h
+                                          0, //! current false:0, true:1, guided mode:2
+                                          1, //! autocontinue to next wp
+                                          (float)Angles::degrees(pitch), //! Pitch Angle (not used for COPTER)
+                                          0, //! Not used
+                                          0, //! Not used
+                                          0, //! Not used
+                                          (float)Angles::degrees(dpath->end_lat), //! Latitude
+                                          (float)Angles::degrees(dpath->end_lon), //! Longitude
+                                          dpath->end_z - m_hae_offset);//! z PARAM7 / z position: global: altitude
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
 
-          m_mission_items.push(msg);
+            // Set AUTO mode
+            mavlink_msg_set_mode_pack(255, 0, &msg,
+                                                m_sysid,
+                                                1,
+                                                PL_MODE_AUTO);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
+            debug("Auto MODE on ardupilot is set");
+          }
 
-//          //! Desired speed
-//          mavlink_msg_mission_item_pack(255, 0, &msg,
-//                                        m_sysid, //! target_system System ID
-//                                        0, //! target_component Component ID
-//                                        seq++, //! seq Sequence
-//                                        MAV_FRAME_GLOBAL, //! frame The coordinate system of the MISSION. see MAV_FRAME in mavlink_types.h
-//                                        MAV_CMD_DO_CHANGE_SPEED, //! command The scheduled action for the MISSION. see MAV_CMD in common.xml MAVLink specs
-//                                        0, //! current false:0, true:1
-//                                        1, //! autocontinue autocontinue to next wp
-//                                        0, //! Speed type (0=Airspeed, 1=Ground Speed)
-//                                        (float)(dpath->speed_units == IMC::SUNITS_METERS_PS ? dpath->speed : -1), //! Speed  (m/s, -1 indicates no change)
-//                                        (float)(dpath->speed_units == IMC::SUNITS_PERCENTAGE ? dpath->speed : -1), //! Throttle  ( Percent, -1 indicates no change)
-//                                        0, //! Not used
-//                                        0, //! Not used
-//                                        0, //! Not used
-//                                        0);//! Not used
-//
-//          m_mission_items.push(msg);
-
-          //! Destination
-          mavlink_msg_mission_item_pack(255, 0, &msg,
-                                        m_sysid, //! target_system System ID
-                                        0, //! target_component Component ID
-                                        seq++, //! seq Sequence
-                                        MAV_FRAME_GLOBAL, //! frame The coordinate system of the MISSION. see MAV_FRAME in mavlink_types.h
-                                        (dpath->lradius ? MAV_CMD_NAV_LOITER_UNLIM : MAV_CMD_NAV_WAYPOINT), //! command The scheduled action for the MISSION. see MAV_CMD in ardupilotmega.h
-                                        0, //! current false:0, true:1
-                                        0, //! autocontinue autocontinue to next wp
-                                        0, //! Not used
-                                        0, //! Not used
-                                        0, //! Not used
-                                        0, //! Not used
-                                        (float)Angles::degrees(dpath->end_lat), //! x PARAM5 / local: x position, global: latitude
-                                        (float)Angles::degrees(dpath->end_lon), //! y PARAM6 / y position: global: longitude
-                                        (float)(dpath->end_z) - m_hae_offset);//! z PARAM7 / z position: global: altitude
-
-          m_mission_items.push(msg);
-
-          mavlink_msg_mission_set_current_pack(255, 0, &msg,
-                                               m_sysid,
-                                               0,
-                                               1);
-
-          n = mavlink_msg_to_send_buffer(buf, &msg);
-          sendData(buf, n);
-
+          // Update PathControlState
           m_pcs.start_lat = m_lat;
           m_pcs.start_lon = m_lon;
           m_pcs.start_z = getHeight();
@@ -1202,11 +1189,9 @@ namespace Control
 
           m_pcs.end_lat = dpath->end_lat;
           m_pcs.end_lon = dpath->end_lon;
+          m_pcs.end_z = dpath->end_z;
+          m_pcs.end_z_units = dpath->end_z_units;
 
-          float alt = (dpath->end_z_units & IMC::Z_NONE) ? m_args.alt : (float)dpath->end_z;
-
-          m_pcs.end_z = alt;
-          m_pcs.end_z_units = IMC::Z_HEIGHT;
           m_pcs.flags = PathControlState::FL_3DTRACK | PathControlState::FL_CCLOCKW;
           m_pcs.flags &= dpath->flags;
           m_pcs.lradius = dpath->lradius;
@@ -1214,7 +1199,87 @@ namespace Control
 
           dispatch(m_pcs);
 
-          debug("Waypoint packet sent to Ardupilot");
+          // Debug output message
+          debug("Takeoff command sent to Ardupilot.");
+        }
+
+        void
+        autoLand(const IMC::Land* land)
+        {
+          // Local variables
+          uint8_t buf[512], mode;
+          uint16_t n;
+          mavlink_message_t msg;
+
+          // Check if in manual mode
+          if (m_external)
+          {
+            inf(DTR("ArduPilot is in Manual mode, unable to perform automatic landing."));
+            return;
+          }
+
+          // Send land command to ardupilot
+          if (m_vehicle_type == VEHICLE_COPTER)
+          {
+            // Set LAND mode.
+            mode = (uint8_t)CP_MODE_LAND;
+            mavlink_msg_set_mode_pack(255, 0, &msg,
+                                      m_sysid,
+                                      1,
+                                      mode);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
+            debug("Land MODE on ardupilot is set.");
+
+            // Send LAND command.
+            sendCommandPacket(MAV_CMD_NAV_LAND, land->abort_z - m_href, 0, 0, 0, (float)Angles::degrees(land->lat), (float)Angles::degrees(land->lon), 0);
+          }
+          else
+          {
+            // Send Mission Count
+            mavlink_msg_mission_count_pack(255, 0, &msg, m_sysid, 0, 2);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
+
+            // Send Write Partial List
+            mavlink_msg_mission_write_partial_list_pack(255, 0, &msg, m_sysid, 0, 1, 1);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
+
+            // Send Mission Item
+            mavlink_msg_mission_item_pack(255, 0, &msg,
+                                          m_sysid,          //! target_system System ID
+                                          0, //! target_component Component ID
+                                          1, //! seq Sequence
+                                          MAV_FRAME_GLOBAL, //! frame The coordinate system of the MISSION. see MAV_FRAME in mavlink_types.h
+                                          MAV_CMD_NAV_LAND, //! command The scheduled action for the MISSION. see MAV_CMD in ardupilotmega.h
+                                          0, //! current false:0, true:1, guided mode:2
+                                          0, //! autocontinue to next wp
+                                          land->abort_z - m_hae_offset,      //! Abort Altitude
+                                          0, //! Not used
+                                          0, //! Not used
+                                          0, //! Not used
+                                          (float)Angles::degrees(land->lat), //! Touchdown Latitude
+                                          (float)Angles::degrees(land->lon), //! Touchdown Longitude
+                                          land->z - m_hae_offset);           //! z PARAM7 / z position: global: altitude
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
+
+            // Set AUTO mode.
+            mode = (uint8_t)PL_MODE_AUTO;
+            mavlink_msg_set_mode_pack(255, 0, &msg,
+                                      m_sysid,
+                                      1,
+                                      mode);
+            n = mavlink_msg_to_send_buffer(buf, &msg);
+            sendData(buf, n);
+            debug("Auto MODE on ardupilot is set.");
+          }
+
+          m_land = true;
+
+          // Debug output message
+          debug("Land command sent to Ardupilot.");
         }
 
         void
@@ -1282,6 +1347,17 @@ namespace Control
 
           if (!m_ground)
             m_offset_st = false;
+
+          if (m_ground && m_land && m_external)
+          {
+            // Clear previous mission on autopilot
+            mavlink_msg_mission_clear_all_pack(255, 0, &m_msg, m_sysid, 0);
+            uint16_t n = mavlink_msg_to_send_buffer(m_buf, &m_msg);
+            sendData(m_buf, n);
+            debug("Cleared mission in ardupilot.");
+
+            m_land = false;
+          }
         }
 
         void
@@ -1539,7 +1615,7 @@ namespace Control
                 switch ((int)m_msg.msgid)
                 {
                   default:
-                    debug("UNDEF: %u", m_msg.msgid);
+                    trace("UNDEF: %u", m_msg.msgid);
                     break;
                   case MAVLINK_MSG_ID_HEARTBEAT:
                     trace("HEARTBEAT");
@@ -1695,25 +1771,30 @@ namespace Control
           double tstamp = Clock::getSinceEpoch();
 
           IMC::Acceleration acce;
-          acce.x = raw.xacc;
-          acce.y = raw.yacc;
-          acce.z = raw.zacc;
+          // raw_imu acc unit is in milli gs
+          // g used in AP is 9.80665 (see libraries/AP_Math/definitions.h)
+          acce.x = raw.xacc*0.001*9.80665;
+          acce.y = raw.yacc*0.001*9.80665;
+          acce.z = raw.zacc*0.001*9.80665;
           acce.setTimeStamp(tstamp);
-          dispatch(acce);
+          dispatch(acce, DF_KEEP_TIME);
 
+          // raw_imu ars unit is milli rad/s
           IMC::AngularVelocity avel;
-          avel.x = raw.xgyro;
-          avel.y = raw.ygyro;
-          avel.z = raw.zgyro;
+          avel.x = raw.xgyro*0.001;
+          avel.y = raw.ygyro*0.001;
+          avel.z = raw.zgyro*0.001;
           avel.setTimeStamp(tstamp);
-          dispatch(avel);
+          dispatch(avel, DF_KEEP_TIME);
 
+          // raw_imu mag unit is milli Tesla
+          // IMC mag unit is Gauss = 10^-4 Tesla
           IMC::MagneticField magn;
-          magn.x = raw.xmag;
-          magn.y = raw.ymag;
-          magn.z = raw.zmag;
+          magn.x = raw.xmag*0.1;
+          magn.y = raw.ymag*0.1;
+          magn.z = raw.zmag*0.1;
           magn.setTimeStamp(tstamp);
-          dispatch(magn);
+          dispatch(magn, DF_KEEP_TIME);
         }
 
         void
@@ -1738,12 +1819,16 @@ namespace Control
               m_hae_offset = wmm.height(m_lat, m_lon);
               m_reboot = false;
               m_offset_st = true;
+              debug("Height offset at %3.10f/%3.10f is %f", Angles::degrees(m_lat), Angles::degrees(m_lon), m_hae_offset);
             }
           }
-          else
+          else if (m_args.convert_msl == false)
           {
             m_hae_offset = 0;
+            m_offset_st = false;
+            debug("Height offset set to zero (convert?%d, gpstype: %d)",m_args.convert_msl, m_fix.type);
           }
+          //else: m_args.convert_msl is true, but we do not have/have lost GPS: leave m_hae_offset as is
 
           m_estate.lat = m_lat;
           m_estate.lon = m_lon;
@@ -1755,7 +1840,7 @@ namespace Control
 
           m_estate.vx = 1e-02 * gp.vx;
           m_estate.vy = 1e-02 * gp.vy;
-          m_estate.vz = -1e-02 * gp.vz;
+          m_estate.vz = 1e-02 * gp.vz;
 
           // Note: the following will yield body-fixed *ground* velocity
           // Maybe this can be fixed w/IAS readings (anyway not too important)
@@ -1765,6 +1850,10 @@ namespace Control
 
           m_estate.alt = (double) gp.relative_alt * 1e-3;   //AGL (relative to home altitude)
           m_estate.depth = -1;
+
+          // Save WGS84 height on the ground
+          if(m_ground)
+            m_href = m_estate.height;
         }
 
         float
@@ -1821,6 +1910,14 @@ namespace Control
 
           m_pressure.value = sc_press.press_abs;
           m_temp.value = 0.01 * sc_press.temperature;
+
+          if(m_temp.value >= (m_args.esc_temp - 5))
+          {
+            if(m_temp.value >= m_args.esc_temp)
+              err("Autopilot temperature reached %fºC! ESC will shutdown!!!", m_temp.value);
+            else
+              war("Autopilot temperature at %fºC! ESC shuts down around %fºC.", m_temp.value, m_args.esc_temp);
+          }
 
           dispatch(m_pressure);
           dispatch(m_temp);
@@ -1894,28 +1991,6 @@ namespace Control
           debug("Mission was received, result is %d", miss_ack.type);
           m_changing_wp = false;
           m_last_wp = 0;
-        }
-
-        void
-        handleMissionCurrentPacket(const mavlink_message_t* msg)
-        {
-          mavlink_mission_current_t miss_curr;
-
-          mavlink_msg_mission_current_decode(msg, &miss_curr);
-          m_current_wp = miss_curr.seq;
-          trace("Current mission item: %d", miss_curr.seq);
-
-          uint8_t buf[512];
-
-          mavlink_message_t msg_out;
-
-          mavlink_msg_mission_request_pack(255, 0, &msg_out,
-                                           m_sysid, //! target_system System ID
-                                           0, //! target_component Component ID
-                                           m_current_wp); //! Mission item to request
-
-          uint16_t n = mavlink_msg_to_send_buffer(buf, &msg_out);
-          sendData(buf, n);
         }
 
         void
@@ -2007,12 +2082,6 @@ namespace Control
                 trace("LOITER");
                 m_external = false;
                 break;
-              case CP_MODE_LAND:
-                mode.autonomy = IMC::AutopilotMode::AL_MANUAL;
-                mode.mode = "LAND";
-                trace("LAND");
-                m_external = true;
-                break;
               case CP_MODE_DUNE:
                 mode.autonomy = IMC::AutopilotMode::AL_AUTO;
                 mode.mode = "DUNE";
@@ -2023,6 +2092,12 @@ namespace Control
                 mode.autonomy = IMC::AutopilotMode::AL_AUTO;
                 mode.mode = "GUIDED";
                 trace("GUIDED");
+                m_external = false;
+                break;
+              case CP_MODE_LAND:
+                mode.autonomy = IMC::AutopilotMode::AL_AUTO;
+                mode.mode = "LAND";
+                trace("LAND");
                 m_external = false;
                 break;
             }
@@ -2042,8 +2117,6 @@ namespace Control
 
                   if (m_mode == PL_MODE_STABILIZE)
                     mode.mode = "STABILIZE";
-                  if (m_mode == PL_MODE_RTL)
-                    mode.mode = "RTL";
                   if (m_mode == PL_MODE_CIRCLE)
                     mode.mode = "CIRCLE";
                   if (m_mode == PL_MODE_AUTOTUNE)
@@ -2093,6 +2166,11 @@ namespace Control
                 m_external = false;
                 m_critical = false;
                 break;
+              case PL_MODE_RTL:
+                mode.autonomy = IMC::AutopilotMode::AL_AUTO;
+                mode.mode = "RTL";
+                trace("RTL");
+                m_external = false;
             }
           }
 
@@ -2110,8 +2188,10 @@ namespace Control
           IMC::DesiredHeading d_head;
           IMC::DesiredZ d_z;
 
-          // As wp_dist is an integer, we calculate distance manually.
-          float copter_distance = 0;
+          // As wp_dist is an integer, and to avoid timing problems with the wp_dist 
+          // not being updated directly after a WP is accepted (sometimes causing two WPs 
+          // to be accepted at the "same" time), we calculate distance manually.
+          float wp_distance = 0;
 
           if (m_vehicle_type == VEHICLE_COPTER)
           {
@@ -2129,12 +2209,29 @@ namespace Control
                                 m_dpath.end_lat, m_dpath.end_lon, alt,
                                 &destination(0), &destination(1), &destination(2));
 
-            copter_distance = (destination - current_pos).norm_2();
-
-            // Store mavlink distance.
-            nav_out.wp_dist = (uint16_t) copter_distance;
-            trace("Copter waypoint dist now: %0.2f", copter_distance);
+            wp_distance = (destination - current_pos).norm_2();
           }
+          else
+          {
+            //Fixed-wing: do not care about height
+            // Calc distance between desired location and current location
+            Matrix destination = Matrix(2, 1, 0.0);
+            Matrix current_pos = Matrix(2, 1, 0.0);
+            current_pos(0) = m_estate.x;
+            current_pos(1) = m_estate.y;
+
+            float alt = (m_dpath.end_z_units & IMC::Z_NONE) ? m_args.alt : (float)m_dpath.end_z;
+
+            WGS84::displacement(m_estate.lat, m_estate.lon, m_estate.height,
+                                m_dpath.end_lat, m_dpath.end_lon, alt,
+                                &destination(0), &destination(1));
+
+            wp_distance = (destination - current_pos).norm_2();
+          }
+
+          // Store mavlink distance.
+          if(!m_service)
+            nav_out.wp_dist = (uint16_t) wp_distance;
 
           d_roll.value = Angles::radians(nav_out.nav_roll);
           d_pitch.value = Angles::radians(nav_out.nav_pitch);
@@ -2160,12 +2257,12 @@ namespace Control
           if (m_vehicle_type == VEHICLE_COPTER)
             is_valid_mode = (m_mode == CP_MODE_GUIDED || (m_mode == CP_MODE_AUTO                     )) ? true : false;
           else
-            is_valid_mode = (m_mode == 15             || (m_mode == 10           && m_current_wp == 3)) ? true : false;
+            is_valid_mode = (m_mode == PL_MODE_GUIDED || (m_mode == PL_MODE_AUTO && m_current_wp == 3)) ? true : false;
 
           // Check Loiter tolerance
           if (m_vehicle_type == VEHICLE_COPTER)
           {
-            if ((copter_distance <= m_args.ltolerance)
+            if ((wp_distance <= m_args.ltolerance)
                && is_valid_mode)
             {
               m_pcs.flags |= PathControlState::FL_LOITERING;
@@ -2173,8 +2270,8 @@ namespace Control
           }
           else
           {
-            if ((nav_out.wp_dist <= m_desired_radius + m_args.ltolerance)
-               && (nav_out.wp_dist >= m_desired_radius - m_args.ltolerance)
+            if ((wp_distance <= m_desired_radius + m_args.ltolerance)
+               && (wp_distance >= m_desired_radius - m_args.ltolerance)
                && is_valid_mode)
             {
               m_pcs.flags |= PathControlState::FL_LOITERING;
@@ -2187,30 +2284,37 @@ namespace Control
           if (m_vehicle_type == VEHICLE_COPTER)
           {
             is_near = (!m_changing_wp
-                && (copter_distance <= m_args.secs * m_gnd_speed
-                    || copter_distance <= m_args.cp_wp_radius)
+                && (wp_distance <= m_args.secs * m_gnd_speed
+                    || wp_distance <= m_args.cp_wp_radius)
                 && is_valid_mode
                 && since_last_wp > 1.0);
           }
           else
           {
+            /* TODO: check ground speed? */
             is_near = (!m_changing_wp
-                && (nav_out.wp_dist <= m_desired_radius + m_args.secs * m_gnd_speed)
-                && (nav_out.wp_dist >= m_desired_radius - m_args.secs * m_gnd_speed)
+                && (wp_distance <= m_desired_radius + m_args.secs * m_gnd_speed)
+                && (wp_distance >= m_desired_radius - m_args.secs * m_gnd_speed)
                 && is_valid_mode
                 && since_last_wp > 1.0);
           }
 
           if (is_near)
           {
+            spew("Is near! dist: %f, rad: %d, gs: %d",wp_distance, m_desired_radius,m_gnd_speed);
             m_pcs.flags |= PathControlState::FL_NEAR;
           }
 
-          if (m_last_wp && since_last_wp > 1.5)
+          // last sent WP took too long. lost? Try again
+          if (m_changing_wp && since_last_wp > 1.5)
+          {
+            war("WP sent to AP not confirmed. Trying to resend");
             receive(&m_dpath);
+          }
+          m_pcs.y = nav_out.xtrack_error;
 
           if (m_gnd_speed)
-            m_pcs.eta = nav_out.wp_dist / m_gnd_speed;
+            m_pcs.eta = wp_distance / m_gnd_speed;
 
           dispatch(m_pcs);
         }
@@ -2244,13 +2348,16 @@ namespace Control
 
           IMC::IndicatedSpeed ias;
           IMC::TrueSpeed gs;
+          IMC::Throttle thr;
 
           ias.value = (fp64_t)vfr_hud.airspeed;
           gs.value = (fp64_t)vfr_hud.groundspeed;
           m_gnd_speed = (int)vfr_hud.groundspeed;
+          thr.value = (uint16_t)vfr_hud.throttle;
 
           dispatch(ias);
           dispatch(gs);
+          dispatch(thr);
         }
 
         void
@@ -2273,17 +2380,6 @@ namespace Control
 
           if (!m_args.hitl)
             dispatch(m_fix);
-        }
-
-        void
-        handleMissionRequestPacket(const mavlink_message_t* msg)
-        {
-          mavlink_mission_request_t mission_request;
-          mavlink_msg_mission_request_decode(msg, &mission_request);
-
-          debug("Requesting item #%d", mission_request.seq);
-
-          sendMissionItem(true);
         }
       };
     }

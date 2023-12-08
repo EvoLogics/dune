@@ -1,6 +1,6 @@
 #! /bin/sh
 ############################################################################
-# Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      #
+# Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      #
 # Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  #
 ############################################################################
 # This file is part of DUNE: Unified Navigation Environment.               #
@@ -104,18 +104,16 @@ modem_probe()
 }
 
 # Update DynDNS IPv4 address.
-# @param[in] ip IPv4 address.
 dyndns_update()
 {
-    echo $DYNDNS_USER $DYNDNS_PASS $DYNDNS_HOST
-
-    if [ -z "$DYNDNS_USER" ] || [ -z "$DYNDNS_PASS" ] || [ -z "$DYNDNS_HOST" ]; then
-        return 0
+    if [ -z "$DYNDNS_URL" ]; then
+    	log err "DynDNS: Service URL not set."
+        exit 1
     fi
-
-    ip="$1"
-    url="http://$DYNDNS_USER:$DYNDNS_PASS@members.dyndns.org/nic/update?hostname=$DYNDNS_HOST&myip=$ip&wildcard=NOCHG&mx=NOCHG&backmx=NOCHG"
-    wget "$url" -O -
+    
+    output=$(wget "$DYNDNS_URL" -O -)   
+    log info "DynDNS: Updated successfully: $output"
+    exit 0 
 }
 
 ppp_start()
@@ -239,6 +237,9 @@ stop()
 }
 
 case "$1" in
+    dyndns_update)
+        dyndns_update
+        ;;
     start)
         start
         ;;

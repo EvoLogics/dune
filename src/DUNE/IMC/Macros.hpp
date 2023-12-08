@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: d292e724592557940354dddbfc5a9d32                            *
+// IMC XML MD5: 0f425402b735f36a64d579da7bb4baf3                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_MACROS_HPP_INCLUDED_
@@ -92,6 +92,10 @@
 #define DUNE_IMC_HISTORICSONARDATA 109
 //! HistoricEvent identification number.
 #define DUNE_IMC_HISTORICEVENT 110
+//! VerticalProfile identification number.
+#define DUNE_IMC_VERTICALPROFILE 111
+//! ProfileSample identification number.
+#define DUNE_IMC_PROFILESAMPLE 112
 //! Heartbeat identification number.
 #define DUNE_IMC_HEARTBEAT 150
 //! Announce identification number.
@@ -138,6 +142,10 @@
 #define DUNE_IMC_HISTORICDATAQUERY 187
 //! RemoteCommand identification number.
 #define DUNE_IMC_REMOTECOMMAND 188
+//! CommSystemsQuery identification number.
+#define DUNE_IMC_COMMSYSTEMSQUERY 189
+//! TelemetryMsg identification number.
+#define DUNE_IMC_TELEMETRYMSG 190
 //! LblRange identification number.
 #define DUNE_IMC_LBLRANGE 200
 //! LblBeacon identification number.
@@ -146,6 +154,8 @@
 #define DUNE_IMC_LBLCONFIG 203
 //! AcousticMessage identification number.
 #define DUNE_IMC_ACOUSTICMESSAGE 206
+//! SimAcousticMessage identification number.
+#define DUNE_IMC_SIMACOUSTICMESSAGE 207
 //! AcousticOperation identification number.
 #define DUNE_IMC_ACOUSTICOPERATION 211
 //! AcousticSystemsQuery identification number.
@@ -154,6 +164,10 @@
 #define DUNE_IMC_ACOUSTICSYSTEMS 213
 //! AcousticLink identification number.
 #define DUNE_IMC_ACOUSTICLINK 214
+//! AcousticRequest identification number.
+#define DUNE_IMC_ACOUSTICREQUEST 215
+//! AcousticStatus identification number.
+#define DUNE_IMC_ACOUSTICSTATUS 216
 //! Rpm identification number.
 #define DUNE_IMC_RPM 250
 //! Voltage identification number.
@@ -204,6 +218,8 @@
 #define DUNE_IMC_DEVDATATEXT 273
 //! DevDataBinary identification number.
 #define DUNE_IMC_DEVDATABINARY 274
+//! Force identification number.
+#define DUNE_IMC_FORCE 275
 //! SonarData identification number.
 #define DUNE_IMC_SONARDATA 276
 //! Pulse identification number.
@@ -434,6 +450,14 @@
 #define DUNE_IMC_AUTONOMOUSSECTION 493
 //! FollowPoint identification number.
 #define DUNE_IMC_FOLLOWPOINT 494
+//! Alignment identification number.
+#define DUNE_IMC_ALIGNMENT 495
+//! StationKeepingExtended identification number.
+#define DUNE_IMC_STATIONKEEPINGEXTENDED 496
+//! ManeuverDone identification number.
+#define DUNE_IMC_MANEUVERDONE 497
+//! Magnetometer identification number.
+#define DUNE_IMC_MAGNETOMETER 499
 //! VehicleState identification number.
 #define DUNE_IMC_VEHICLESTATE 500
 //! VehicleCommand identification number.
@@ -462,6 +486,24 @@
 #define DUNE_IMC_FORMATIONSTATE 512
 //! ReportControl identification number.
 #define DUNE_IMC_REPORTCONTROL 513
+//! StateReport identification number.
+#define DUNE_IMC_STATEREPORT 514
+//! TransmissionRequest identification number.
+#define DUNE_IMC_TRANSMISSIONREQUEST 515
+//! TransmissionStatus identification number.
+#define DUNE_IMC_TRANSMISSIONSTATUS 516
+//! SmsRequest identification number.
+#define DUNE_IMC_SMSREQUEST 517
+//! SmsStatus identification number.
+#define DUNE_IMC_SMSSTATUS 518
+//! VtolState identification number.
+#define DUNE_IMC_VTOLSTATE 519
+//! ArmingState identification number.
+#define DUNE_IMC_ARMINGSTATE 520
+//! TCPRequest identification number.
+#define DUNE_IMC_TCPREQUEST 521
+//! TCPStatus identification number.
+#define DUNE_IMC_TCPSTATUS 522
 //! Abort identification number.
 #define DUNE_IMC_ABORT 550
 //! PlanSpecification identification number.
@@ -562,6 +604,8 @@
 #define DUNE_IMC_UAMTXSTATUS 816
 //! UamRxRange identification number.
 #define DUNE_IMC_UAMRXRANGE 817
+//! UamTxRange identification number.
+#define DUNE_IMC_UAMTXRANGE 818
 //! FormCtrlParam identification number.
 #define DUNE_IMC_FORMCTRLPARAM 820
 //! FormationEval identification number.
@@ -570,6 +614,14 @@
 #define DUNE_IMC_FORMATIONCONTROLPARAMS 822
 //! FormationEvaluation identification number.
 #define DUNE_IMC_FORMATIONEVALUATION 823
+//! SoiWaypoint identification number.
+#define DUNE_IMC_SOIWAYPOINT 850
+//! SoiPlan identification number.
+#define DUNE_IMC_SOIPLAN 851
+//! SoiCommand identification number.
+#define DUNE_IMC_SOICOMMAND 852
+//! SoiState identification number.
+#define DUNE_IMC_SOISTATE 853
 //! MessagePart identification number.
 #define DUNE_IMC_MESSAGEPART 877
 //! NeptusBlob identification number.
@@ -612,5 +664,11 @@
 #define DUNE_IMC_APMSTATUS 906
 //! SadcReadings identification number.
 #define DUNE_IMC_SADCREADINGS 907
+//! DmsDetection identification number.
+#define DUNE_IMC_DMSDETECTION 908
+//! HomePosition identification number.
+#define DUNE_IMC_HOMEPOSITION 909
+//! TotalMagIntensity identification number.
+#define DUNE_IMC_TOTALMAGINTENSITY 2006
 
 #endif

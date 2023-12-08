@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -80,12 +80,26 @@ namespace DUNE
     }
 
     void
-    String::rtrim(char* str)
+    String::rightTrimInPlace(char* str)
     {
       char* r = str + std::strlen(str) - 1; // Rightmost character
 
       for (; isspace(*r); --r)
         *r = 0;
+    }
+
+    void
+    String::resize(char* str, int size)
+    {
+      int i;
+
+      if (size < 0)
+        size = std::strlen(str) + size;
+      if (size < 0 || (int)std::strlen(str) <= size)
+        return;
+
+      for (i = std::strlen(str) - 1; i >= size; i--)
+        *(str + i) = 0;
     }
 
     std::string
@@ -165,6 +179,20 @@ namespace DUNE
       return rv;
     }
 
+    std::string
+    String::replaceAll(const std::string& inStr, const std::string& searchStr, const std::string& replaceStr)
+    {
+      std::string result = inStr;
+      size_t pos = result.find(searchStr);
+      while (pos != std::string::npos)
+      {
+        result.replace(pos, searchStr.size(), replaceStr);
+        pos = result.find(searchStr, pos + searchStr.size());
+      }
+
+      return result;
+    }
+
     void
     String::toLowerCase(std::string& str)
     {
@@ -218,6 +246,21 @@ namespace DUNE
       ss << std::hex << nr;
 
       return ss.str();
+    }
+
+    std::vector<uint8_t>
+    String::hexToBytes(const std::string& hex)
+    {
+      std::vector<uint8_t> bytes;
+
+      for (unsigned int i = 0; i < hex.length(); i += 2)
+      {
+        std::string byteString = hex.substr(i, 2);
+        uint8_t byte = (uint8_t) strtol(byteString.c_str(), NULL, 16);
+        bytes.push_back(byte);
+      }
+
+      return bytes;
     }
 
     std::string

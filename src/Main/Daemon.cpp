@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -61,6 +61,10 @@
 // Microsoft Windows headers.
 #if defined(DUNE_SYS_HAS_WINDOWS_H)
 #  include <windows.h>
+#endif
+
+#if defined(DUNE_SYS_HAS_SYS_REBOOT_H)
+#  include <sys/reboot.h>
 #endif
 
 void
@@ -142,11 +146,24 @@ setDaemonSignalHandlers(void)
 }
 
 int
+callReboot()
+{
+#if defined(DUNE_OS_POSIX)
+  sync();
+  return reboot(RB_AUTOBOOT);
+#else
+  DUNE_WRN("Daemon", "Reboot not supported");
+  return -1;
+#endif
+}
+
+int
 runDaemon(DUNE::Daemon& daemon)
 {
   setDaemonSignalHandlers();
 
   bool call_abort = false;
+  bool call_reboot = false;
 
   try
   {
@@ -164,6 +181,7 @@ runDaemon(DUNE::Daemon& daemon)
     }
 
     DUNE_WRN("Daemon", DTR("stopping tasks"));
+    call_reboot = daemon.callReboot();
     daemon.stopAndJoin();
   }
   catch (std::exception& e)
@@ -175,6 +193,15 @@ runDaemon(DUNE::Daemon& daemon)
   {
     DUNE_ERR("Daemon", DTR("unhandled exception"));
     return 1;
+  }
+
+  if(call_reboot)
+  {
+    DUNE_WRN("Daemon", "Rebooting");
+
+    int rt = callReboot();
+    if (rt != -1)
+      return rt;
   }
 
   if (call_abort)
@@ -260,6 +287,7 @@ main(int argc, char** argv)
   try
   {
     context.config.parseFile(cfg_file.c_str());
+    context.original_cfg.parseFile(cfg_file.c_str());
   }
   catch (std::runtime_error& e)
   {
@@ -267,6 +295,7 @@ main(int argc, char** argv)
     {
       cfg_file = context.dir_usr_cfg / options.value("--config-file") + ".ini";
       context.config.parseFile(cfg_file.c_str());
+      context.original_cfg.parseFile(cfg_file.c_str());
       context.dir_cfg = context.dir_usr_cfg;
     }
     catch (std::runtime_error& e2)

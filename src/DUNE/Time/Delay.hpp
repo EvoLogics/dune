@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -33,7 +33,7 @@
 // DUNE headers.
 #include <DUNE/Config.hpp>
 #include <DUNE/Time/Constants.hpp>
-
+#include <DUNE/Time/Clock.hpp>
 namespace DUNE
 {
   namespace Time
@@ -78,6 +78,7 @@ namespace DUNE
         uint64_t secs = (uint64_t)s;
         uint64_t nsecs = secs * c_nsec_per_sec + (uint64_t)((s - secs) * c_nsec_per_sec_fp);
 
+        nsecs /= Time::Clock::getTimeMultiplier();
         waitNsec(nsecs);
       }
     };

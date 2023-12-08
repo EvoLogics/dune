@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -307,7 +307,7 @@ namespace Autonomy
         startPlan.arg.set(spec);
         startPlan.request_id = 0;
         startPlan.flags = 0;
-
+        startPlan.setDestination(m_ctx.resolver.id());
         dispatch(startPlan);
       }
 

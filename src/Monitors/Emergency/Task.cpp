@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -64,12 +64,16 @@ namespace Monitors
       float m_fuel;
       //! Confidence in fuel level.
       float m_fuel_conf;
+      //! Batteries voltage
+      float m_bat_voltage;
       //! True if executing plan.
       bool m_in_mission;
       //! Executing plan's progress.
       float m_progress;
       //! Iridium request identifier.
       unsigned m_req;
+      //! Vehicle State
+      uint8_t m_vstate;
       //! Lost communications timer.
       Counter<double> m_lost_coms_timer;
       //! Medium handler.
@@ -125,6 +129,15 @@ namespace Monitors
         bind<IMC::ReportControl>(this);
         bind<IMC::VehicleMedium>(this);
         bind<IMC::TextMessage>(this);
+        bind<IMC::VehicleState>(this);
+        bind<IMC::Voltage>(this);
+      }
+
+      void
+      onUpdateParameters(void)
+      {
+        if (paramChanged(m_args.heartbeat_tout))
+          m_lost_coms_timer.setTop(m_args.heartbeat_tout);
       }
 
       void
@@ -152,7 +165,9 @@ namespace Monitors
         m_lost_coms_timer.setTop(m_args.heartbeat_tout);
         m_fuel = -1.0;
         m_fuel_conf = -1.0;
+        m_bat_voltage = -1.0;
         m_progress = -1.0;
+        m_vstate = '?';
       }
 
       void
@@ -182,11 +197,11 @@ namespace Monitors
 
           Time::BrokenDown bdt;
 
-          m_emsg = String::str("(%s) %02u:%02u:%02u / %d %f, %d %f / f:%d c:%d",
+          m_emsg = String::str("(%s) %02u:%02u:%02u / %d %f, %d %f / f:%d v:%d c:%d / s: %c",
                                getSystemName(),
                                bdt.hour, bdt.minutes, bdt.seconds,
                                lat_deg, lat_min, lon_deg, lon_min,
-                               (int)m_fuel, (int)m_fuel_conf);
+                               (int)m_fuel, (int) m_bat_voltage, (int)m_fuel_conf, vehicleStateChar(m_vstate));
 
           m_emsg += m_in_mission ? String::str(" / p:%d", (int)m_progress) : "";
         }
@@ -255,6 +270,20 @@ namespace Monitors
       }
 
       void
+      consume(const IMC::Voltage* msg)
+      {
+        try
+        {
+          if(msg->getSourceEntity() != resolveEntity("Batteries"))
+            return;
+          m_bat_voltage = msg->value * 10;
+        }
+        catch (std::runtime_error& e) {
+          spew("Batteries entity is not present.");
+        }
+      }
+
+      void
       consume(const IMC::PlanControlState* msg)
       {
         m_in_mission = msg->state == IMC::PlanControlState::PCS_EXECUTING;
@@ -270,6 +299,34 @@ namespace Monitors
           m_lost_coms_timer.reset();
       }
 
+      void
+      consume(const IMC::VehicleState* msg)
+      {
+        m_vstate = msg->op_mode;
+      }
+
+      char
+      vehicleStateChar(const uint8_t vstate)
+      {
+        switch((IMC::VehicleState::OperationModeEnum) vstate)
+        {
+          case IMC::VehicleState::VS_BOOT:
+            return 'B';
+          case IMC::VehicleState::VS_CALIBRATION:
+            return 'C';
+          case IMC::VehicleState::VS_ERROR:
+            return 'E';
+          case IMC::VehicleState::VS_EXTERNAL:
+            return 'X';
+          case IMC::VehicleState::VS_MANEUVER:
+            return 'M';
+          case IMC::VehicleState::VS_SERVICE:
+            return 'S';
+          default:
+            return '?';
+        }
+      }
+
       //! Send SMS request.
       //! @param[in] prefix message prefix.
       //! @param[in] timeout time to live.
@@ -277,49 +334,62 @@ namespace Monitors
       void
       sendSMS(const char* prefix, unsigned timeout, std::string recipient = "")
       {
-        IMC::Sms sms;
-        if (recipient.size() == 0)
-          sms.number = m_args.recipient;
-        else
-          sms.number = recipient;
+        IMC::TransmissionRequest msg;
+        msg.data_mode= IMC::TransmissionRequest::DMODE_TEXT;
 
-        sms.timeout = timeout;
+        if (recipient.size() == 0)
+          msg.destination = m_args.recipient;
+        else
+          msg.destination = recipient;
+
+        msg.deadline = Time::Clock::getSinceEpoch() + timeout;
 
         if (!m_emsg.empty())
         {
-          sms.contents = String::str("(%s) %s", prefix, m_emsg.c_str());
+          msg.txt_data = String::str("(%s) %s", prefix, m_emsg.c_str());
         }
         else
         {
-          std::string msg;
+          std::string s;
           Time::BrokenDown bdt;
-          msg = String::str("(%s) %02u:%02u:%02u / Unknown Location / f:%d c:%d",
+          s = String::str("(%s) %02u:%02u:%02u / Unknown Location / f:%d v:%d c:%d",
                                getSystemName(),
                                bdt.hour, bdt.minutes, bdt.seconds,
-                               (int)m_fuel, (int)m_fuel_conf);
+                            (int)m_fuel, (int)m_bat_voltage, (int)m_fuel_conf);
 
-          msg += m_in_mission ? String::str(" / p:%d", (int)m_progress) : "";
+          s += m_in_mission ? String::str(" / p:%d", (int)m_progress) : "";
+          s += String::str("/ s: %c", vehicleStateChar(m_vstate));
 
-          sms.contents = String::str("(%s) %s", prefix, msg.c_str());
+          msg.txt_data = String::str("(%s) %s", prefix, s.c_str());
         }
 
-        inf(DTR("sending SMS (t:%u) to %s: %s"),
-            timeout, sms.number.c_str(), sms.contents.c_str());
+        msg.setDestination(getSystemId());
+        msg.setDestinationEntity(getEntityId());
 
         bool ird = m_args.interface == "Iridium" || m_args.interface == "Both";
         bool gsm = m_args.interface == "GSM" || m_args.interface == "Both";
 
         if (ird)
         {
-          DUNE::IMC::IridiumMsgTx m;
-          m.req_id = m_req++;
-          m.ttl = 60;
-          m.data.assign(sms.contents.begin(), sms.contents.end());
-          dispatch(m);
+          msg.comm_mean=IMC::TransmissionRequest::CMEAN_SATELLITE;
+          msg.deadline+=30;
+          msg.req_id=m_req++;
+          dispatch(msg);
+
+          inf(DTR("sending IridiumMsg (t:%u) to %s: %s"),
+                    timeout, msg.destination.c_str(), msg.txt_data.c_str());
         }
 
-        if (gsm)
-          dispatch(sms);
+        if (gsm){
+          msg.comm_mean=IMC::TransmissionRequest::CMEAN_GSM;
+          msg.req_id=m_req++;
+          dispatch(msg);
+
+          inf(DTR("sending SMS (t:%u) to %s: %s"),
+                    timeout, msg.destination.c_str(), msg.txt_data.c_str());
+        }
+
+
       }
 
       //! Send all scheduled reports.

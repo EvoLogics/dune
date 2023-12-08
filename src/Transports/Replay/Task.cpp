@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -47,6 +47,8 @@ namespace Transports
       std::string startup_file;
       std::vector<std::string> msgs;
       std::vector<std::string> ents;
+      double time_multiplier;
+      double initial_log_skip_seconds;
     };
 
     static const int c_stats_period = 10;
@@ -110,6 +112,15 @@ namespace Transports
         .defaultValue("")
         .description("Entities for which state should be reported");
 
+        param("Time Multiplier", m_args.time_multiplier)
+        .defaultValue("1.0")
+        .description("Time multiplier for fast replay.");
+
+        param("Seconds to skip", m_args.initial_log_skip_seconds)
+        .minimumValue("0")
+        .defaultValue("0")
+        .description("Number of seconds to skip in the beginning of the log");
+
         bind<IMC::ReplayControl>(this);
       }
 
@@ -123,6 +134,12 @@ namespace Transports
           bind<IMC::EstimatedState>(this);
 
         reset();
+
+        if (m_args.time_multiplier != 1.0)
+        {
+          Time::Clock::setTimeMultiplier(m_args.time_multiplier);
+          war("Using time multiplier: x%.2f", Time::Clock::getTimeMultiplier());
+        }
       }
 
       ~Task(void)
@@ -196,6 +213,20 @@ namespace Transports
       }
 
       void
+      updateEntityMap(IMC::Message* m)
+      {
+        IMC::EntityInfo* ei = static_cast<IMC::EntityInfo*>(m);
+        Name2Eid::iterator itr = m_name2eid.find(ei->label);
+
+        if (itr != m_name2eid.end())
+        {
+          m_eid2eid[ei->id] = itr->second;
+
+          trace("entity %s %d --> %d", ei->label.c_str(), (int)ei->id, (int)itr->second);
+        }
+      }
+
+      void
       startReplay(const std::string& file)
       {
         if (isActive())
@@ -261,14 +292,51 @@ namespace Transports
         lc->op = IMC::LoggingControl::COP_REQUEST_START;
         dispatch(lc); // change log (if Logging task happens to be active)
 
-        m_ts_delta = lc->getTimeStamp() - m_ts_delta;
-        m_start_time = lc->getTimeStamp();
+        // skip messages
+        if (m_args.initial_log_skip_seconds > 0)
+        {
+          m = getFirstMessageAfterSkip(m_args.initial_log_skip_seconds);
+          if (!m)
+          {
+            err("No messages for specified time range");
+            return;
+          }
+          else
+            inf("Skipped messages up to %s", Time::Format::getTimeDate(m->getTimeStamp()).c_str());
+        }
+
+        m_ts_delta = lc->getTimeStamp() - m_ts_delta - m_args.initial_log_skip_seconds;
+        m_start_time = m->getTimeStamp();
         m_next_stats = m_start_time + c_stats_period;
         delete m;
 
         requestActivation();
 
         war("%s '%s'", DTR("started replay of"), file.c_str());
+      }
+
+      IMC::Message*
+      getFirstMessageAfterSkip(double time_to_skip)
+      {
+        IMC::Message* m = 0;
+        double time_origin = m_ts_delta;
+        m = IMC::Packet::deserialize(*m_is);
+        while (m)
+        {
+          if (m->getTimeStamp() - time_origin >= time_to_skip)
+            return m;
+          // Do not miss information from EntityInfo
+          if (m->getId() == DUNE_IMC_ENTITYINFO)
+          {
+            updateEntityMap(m);
+          }
+
+          delete m;
+          m = IMC::Packet::deserialize(*m_is);
+          if(getDebugLevel() >= DEBUG_LEVEL_SPEW)
+            m->toText(std::cout);
+        }
+        return NULL;
       }
 
       void
@@ -322,15 +390,63 @@ namespace Transports
           m_is = 0;
         }
         m_eid2eid.clear();
-        m_name2eid.clear();
-        m_eid2name.clear();
         m_tstats.clear();
         m_tgstats = Stats();
       }
 
       void
+      dispatchWithNewTime(IMC::Message* m)
+      {
+        double original_ts;
+
+        if (m->getId() == DUNE_IMC_LBLCONFIG)
+          original_ts = m_start_time - m_ts_delta;
+        else
+          original_ts = m->getTimeStamp();
+
+        double new_ts = original_ts + m_ts_delta;
+        m->setTimeStamp(new_ts);
+
+        // Wait till the time is right
+        double now = Clock::getSinceEpoch();
+        double delta = new_ts - now;
+
+        double delay;
+
+        if (delta >= 1e-03)
+        {
+          // Delay::wait does not behave satisfactorily otherwise
+          // in some systems
+          Delay::wait(delta);
+          delay = Clock::getSinceEpoch() - new_ts;
+        }
+        else
+        {
+          delay = 0;
+          delta = 0;
+        }
+
+        // Counter for delay before bus delivery
+        updateStats(m_tstats[m->getName()], delay);
+        updateStats(m_tgstats, delay);
+
+        // Dispatch message
+        dispatch(m, DF_KEEP_TIME);
+
+        if (now >= m_next_stats)
+        {
+          displayStats();
+          m_next_stats += c_stats_period;
+        }
+
+        spew("%s %0.4f %s", m->getName(), (new_ts - m_start_time),
+             m_eid2name[m->getSourceEntity()].c_str());
+      }
+
+      void
       onMain(void)
       {
+
         if (!m_args.startup_file.empty())
           startReplay(m_args.startup_file);
 
@@ -360,15 +476,7 @@ namespace Transports
             else if (m->getId() == DUNE_IMC_ENTITYINFO)
             {
               // Update entity id map
-              IMC::EntityInfo* ei = static_cast<IMC::EntityInfo*>(m);
-              Name2Eid::iterator itr = m_name2eid.find(ei->label);
-
-              if (itr != m_name2eid.end())
-              {
-                m_eid2eid[ei->id] = itr->second;
-
-                trace("entity %s %d --> %d", ei->label.c_str(), (int)ei->id, (int)itr->second);
-              }
+              updateEntityMap(m);
             }
 
             m->setSourceEntity(mapEntity(m->getSourceEntity()));
@@ -376,50 +484,7 @@ namespace Transports
 
             if ((m->getId() == DUNE_IMC_ENTITYSTATE && m->getSourceEntity() != DUNE_IMC_CONST_UNK_EID) || m_replay.find(m->getName()) != m_replay.end())
             {
-              double original_ts;
-
-              if (m->getId() == DUNE_IMC_LBLCONFIG)
-                original_ts = m_start_time - m_ts_delta;
-              else
-                original_ts = m->getTimeStamp();
-
-              double new_ts = original_ts + m_ts_delta;
-              m->setTimeStamp(new_ts);
-
-              // Wait till the time is right
-              double now = Clock::getSinceEpoch();
-              double delta = new_ts - now;
-
-              double delay;
-
-              if (delta >= 1e-03)
-              {
-                // Delay::wait does not behave satisfactorily otherwise
-                // in some systems
-                Delay::wait(delta);
-                delay = Clock::getSinceEpoch() - new_ts;
-              }
-              else
-              {
-                delay = 0;
-                delta = 0;
-              }
-
-              // Counter for delay before bus delivery
-              updateStats(m_tstats[m->getName()], delay);
-              updateStats(m_tgstats, delay);
-
-              // Dispatch message
-              dispatch(m, DF_KEEP_TIME);
-
-              if (now >= m_next_stats)
-              {
-                displayStats();
-                m_next_stats += c_stats_period;
-              }
-
-              spew("%s %0.4f %s", m->getName(), (new_ts - m_start_time),
-                   m_eid2name[m->getSourceEntity()].c_str());
+              dispatchWithNewTime(m);
             }
           }
 

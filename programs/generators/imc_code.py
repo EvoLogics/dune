@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 ############################################################################
-# Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      #
+# Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      #
 # Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  #
 ############################################################################
 # This file is part of DUNE: Unified Navigation Environment.               #
@@ -108,7 +108,7 @@ class Message:
         public.append(f)
 
         # clone()
-        f = Function('clone', 'Message*', const = True, inline = True)
+        f = Function('clone', '%(abbrev)s*' % node.attrib, const = True, inline = True)
         f.body('return new %(abbrev)s(*this);' % node.attrib)
         public.append(f)
 

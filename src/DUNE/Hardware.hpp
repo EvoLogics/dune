@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -55,5 +55,7 @@ namespace DUNE
 #include <DUNE/Hardware/LUCL/Protocol.hpp>
 #include <DUNE/Hardware/LUCL/ProtocolParser.hpp>
 #include <DUNE/Hardware/LUCL/BootLoader.hpp>
+#include <DUNE/Hardware/PWM.hpp>
+#include <DUNE/Hardware/SocketCAN.hpp>
 
 #endif

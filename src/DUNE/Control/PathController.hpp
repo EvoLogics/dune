@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -32,7 +32,6 @@
 
 // ISO C++ 98 headers.
 #include <string>
-#include <map>
 
 // DUNE headers.
 #include <DUNE/Coordinates.hpp>
@@ -157,6 +156,7 @@ namespace DUNE
           double x;
           double y;
           double z;
+          uint8_t z_units;
         } start, end;
 
         //! bearing from start to end.
@@ -172,6 +172,8 @@ namespace DUNE
         //! current ground speed if course control enabled,
         //! body-fixed frame u speed otherwise.
         double speed;
+        //! Vertical speed.
+        double vertical_speed;
         //! course error in relation to track bearing.
         double course_error;
 
@@ -243,6 +245,27 @@ namespace DUNE
         return false;
       }
 
+      //! Default implementation for calculating estimated time of arrival,
+      //! that can be overridden to change how maneuver completion is signalized.
+      //! @param ts the current tracking state
+      //! @param time_factor for time of arrival factor
+      //! @param speed
+      //! @return the calculated estimated time of arrival
+      virtual double
+      getEta(const TrackingState& ts);
+
+      float
+      getSpeed(void) const
+      { 
+        return std::max((double)m_eta_min_speed, m_ts.speed);
+      }
+
+      float
+      getTimeFactor(void) const
+      {
+        return m_time_factor;
+      }
+
       //! Signal an error.
       //! This method should be used by subclasses to signal an error condition.
       //! @param msg error message
@@ -297,6 +320,20 @@ namespace DUNE
       void
       updateTrackingState(void);
 
+      // Helper functions for consume(const IMC::DesiredPath*)
+      bool
+      setStartPoint(double now, const IMC::DesiredPath* dpath);
+      void
+      setEndPoint(const IMC::DesiredPath* dpath);
+      void
+      setControlLoops(const IMC::DesiredPath* dpath);
+      void
+      handleLoiter(const IMC::DesiredPath* dpath);
+
+      // Helper function for consume(const IMC::EstimatedState*)
+      void
+      handleMonitors(void);
+
       //! Test if there has been a jump in navigation
       //! @param[in] new_state newly received EstimatedState
       //! @param[in] old_state newly received EstimatedState
@@ -306,7 +343,7 @@ namespace DUNE
       bool
       navigationJumped(const IMC::EstimatedState* new_state,
                        const IMC::EstimatedState* old_state,
-                       float &distance, bool change_ref);
+                       float& distance, bool change_ref);
 
       //! Monitor along track error and update variables
       void
@@ -336,10 +373,16 @@ namespace DUNE
       //! @param[out] y y coordinate relatively to path
       template <typename T>
       inline void
-      getTrackPosition(const T& coord, double* x, double* y = 0)
+      getTrackPosition(const T& coord, double* x, double* y = 0) const
       {
         Coordinates::getTrackPosition(m_ts.start, m_ts.track_bearing, coord, x, y);
       }
+
+      //! Get EstimatedState vertical position, based on ZUnits 
+      //! @param unit Coordenate unit
+      //! @return EstimatedSate vertical position
+      double
+      getZ(IMC::ZUnits unit);
 
       //! Deactivate bottom tracker
       void
@@ -348,7 +391,7 @@ namespace DUNE
       //! Is the system performing bottom tracking ?
       //! @return true if it is bottom tracking, false otherwise.
       bool
-      isTrackingBottom(void)
+      isTrackingBottom(void) const
       {
         return m_btd.enabled && (m_btrack != NULL);
       }
@@ -458,6 +501,8 @@ namespace DUNE
       BottomTracker* m_btrack;
       //! Control loops last reference
       uint32_t m_scope_ref;
+      //! Maximum admitted track length
+      double m_max_track_length;
     };
   }
 }

@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -360,6 +360,18 @@ namespace DUNE
       }
 
       static inline uint16_t
+      copy(int64_t& dest, const uint8_t* src)
+      {
+        return copy8b(reinterpret_cast<uint8_t*>(&dest), src);
+      }
+
+      static inline uint16_t
+      copy(uint64_t& dest, const uint8_t* src)
+      {
+        return copy8b(reinterpret_cast<uint8_t*>(&dest), src);
+      }
+
+      static inline uint16_t
       copy(fp32_t& dest, const uint8_t* src)
       {
         return copy4b(reinterpret_cast<uint8_t*>(&dest), src);
@@ -405,6 +417,18 @@ namespace DUNE
       rcopy(uint32_t& dest, const uint8_t* src)
       {
         return rcopy4b(reinterpret_cast<uint8_t*>(&dest), src);
+      }
+
+      static inline uint16_t
+      rcopy(int64_t& dest, const uint8_t* src)
+      {
+        return rcopy8b(reinterpret_cast<uint8_t*>(&dest), src);
+      }
+
+      static inline uint16_t
+      rcopy(uint64_t& dest, const uint8_t* src)
+      {
+        return rcopy8b(reinterpret_cast<uint8_t*>(&dest), src);
       }
 
       static inline uint16_t
@@ -465,6 +489,26 @@ namespace DUNE
       toLE(const int32_t value, uint8_t* dst)
       {
         return toLE(static_cast<uint32_t>(value), dst);
+      }
+
+      static inline unsigned
+      toLE(const float value, uint8_t* dst)
+      {
+#if defined(DUNE_CPU_BIG_ENDIAN)
+        return rcopy4b(dst, (uint8_t*)&value);
+#else
+        return copy4b(dst, (uint8_t*)&value);
+#endif
+      }
+      
+      static inline unsigned
+      toLE(const double value, uint8_t* dst)
+      {
+#if defined(DUNE_CPU_BIG_ENDIAN)
+        return rcopy8b(dst, (uint8_t*)&value);
+#else
+        return copy8b(dst, (uint8_t*)&value);
+#endif
       }
 
       static inline unsigned

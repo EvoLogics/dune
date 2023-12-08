@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -57,6 +57,7 @@ namespace DUNE
     static const unsigned c_nsec_per_msec = 1000000u;
     //! Number of nanoseconds in a second (floating point).
     static const double c_nsec_per_sec_fp = 1000000000.0;
+    //! Time multiplier to use in simulation
   }
 }
 

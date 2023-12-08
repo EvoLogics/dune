@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -58,6 +58,12 @@ namespace Transports
       double mbox_check_per;
       //! Maximum transmission rate.
       unsigned max_tx_rate;
+      //! Flush Iridium Queue on start
+      bool flush_queue;
+      //! Flag to control use of 9523N Module
+      bool use_9523;
+      //! Serial port baud rate fot 9523N Module.
+      unsigned uart_baud_9523;
     };
 
     struct Task: public DUNE::Tasks::Task
@@ -103,15 +109,26 @@ namespace Transports
         .units(Units::Second)
         .defaultValue("300")
         .description("Amount of time without alert rings or "
-                     "MT SBDs before doing a mailbox check");
+            "MT SBDs before doing a mailbox check");
 
         param("Maximum Transmission Rate", m_args.max_tx_rate)
         .units(Units::Second)
         .defaultValue("0")
         .description("");
 
+        param("Flush Iridium Queue", m_args.flush_queue)
+        .defaultValue("false");
+
+        param("Use 9523N Module", m_args.use_9523)
+        .defaultValue("false");
+
+        param("Serial Port 9523 - Baud Rate", m_args.uart_baud_9523)
+        .defaultValue("115200")
+        .description("Serial port baud rate for 9523N Module");
+
         bind<IMC::IridiumMsgTx>(this);
         bind<IMC::IoEvent>(this);
+        m_queued_mt = 0;
       }
 
       //! Destructor.
@@ -124,7 +141,7 @@ namespace Transports
           TxRequest* req = m_tx_requests.front();
           m_tx_requests.pop_front();
           sendTxRequestStatus(req, IMC::IridiumTxStatus::TXSTATUS_ERROR,
-                              DTR("task is shutting down"));
+              DTR("task is shutting down"));
           delete req;
         }
       }
@@ -146,10 +163,18 @@ namespace Transports
       {
         try
         {
-          m_uart = new SerialPort(m_args.uart_dev, m_args.uart_baud);
-          m_driver = new Driver(this, m_uart);
+          if(m_args.use_9523)
+            m_uart = new SerialPort(m_args.uart_dev, m_args.uart_baud_9523);
+          else
+            m_uart = new SerialPort(m_args.uart_dev, m_args.uart_baud);
+          m_driver = new Driver(this, m_uart, m_args.use_9523, c_pwr_on_delay);
           m_driver->initialize();
           m_driver->setTxRateMax(m_args.max_tx_rate);
+          if(m_args.use_9523)
+          {
+            inf("LIDB FW: %s", m_driver->getFirmVersionLIDB().c_str());
+            inf("Model: %s | IMEI: %s", m_driver->getModel().c_str(), m_driver->getIMEI().c_str());
+          }
           debug("manufacturer: %s", m_driver->getManufacturer().c_str());
           debug("model: %s", m_driver->getModel().c_str());
           debug("IMEI: %s", m_driver->getIMEI().c_str());
@@ -172,6 +197,19 @@ namespace Transports
       {
         m_mbox_check_timer.reset();
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
+
+        if (m_args.flush_queue)
+        {
+          IridiumMsgTx req;
+          std::string data = "FLUSH_MT";
+          req.data.assign(data.begin(), data.end());
+          req.destination = "broadcast";
+          req.ttl = 60;
+          req.setSource(m_ctx.resolver.id());
+          req.setDestination(m_ctx.resolver.id());
+          consume(&req);
+          war("Flushing MT Queue");
+        }
       }
 
       void
@@ -210,9 +248,10 @@ namespace Transports
       void
       consume(const IMC::IridiumMsgTx* msg)
       {
-        // FIXME: check if req_id already exists.
-        // FIXME: check MTU.
-        debug("queueing message");
+        if (msg->getSource() != getSystemId()
+            && msg->getDestination() != getSystemId())
+          return;
+
         unsigned src_adr = msg->getSource();
         unsigned src_eid = msg->getSourceEntity();
         TxRequest* request = new TxRequest(src_adr, src_eid, msg->req_id,
@@ -224,8 +263,8 @@ namespace Transports
 
       void
       sendTxRequestStatus(const TxRequest* request,
-                          IMC::IridiumTxStatus::StatusCodeEnum code,
-                          const std::string& text = "")
+          IMC::IridiumTxStatus::StatusCodeEnum code,
+          const std::string& text = "")
       {
         IMC::IridiumTxStatus status;
         status.setDestination(request->getSource());
@@ -264,6 +303,7 @@ namespace Transports
         debug("dequeing message");
         m_driver->clearBufferMO();
         sendTxRequestStatus(m_tx_request, IMC::IridiumTxStatus::TXSTATUS_OK);
+        inf(DTR("Message sent successfully."));
         Memory::clear(m_tx_request);
       }
 
@@ -280,7 +320,7 @@ namespace Transports
         m_tx_request->invalidateMSN();
 
         sendTxRequestStatus(m_tx_request, IMC::IridiumTxStatus::TXSTATUS_ERROR,
-                            String::str(DTR("failed with error %u"), err_code));
+            String::str(DTR("failed with error %u"), err_code));
 
         enqueueTxRequest(m_tx_request);
         m_tx_request = NULL;
@@ -376,6 +416,15 @@ namespace Transports
             m_driver->checkMailBoxAlert();
           else if (m_driver->getQueuedMT() > 0 || m_mbox_check_timer.overflow())
             m_driver->checkMailBox();
+          else if(m_driver->getQueuedMT() == 0) //No messages to be received or sent
+          {
+            unsigned src_adr = getSystemId();
+            unsigned src_eid = getEntityId();
+            const std::vector<char> data(1);
+            TxRequest* empty_req = new TxRequest(src_adr, src_eid, 0xFFFF, 0, data);
+            sendTxRequestStatus(empty_req, IMC::IridiumTxStatus::TXSTATUS_EMPTY,"No message to be received or sent.");
+            debug(DTR("No message to be received or sent."));
+          }
         }
         else
         {

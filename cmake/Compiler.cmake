@@ -1,5 +1,5 @@
 ############################################################################
-# Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      #
+# Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      #
 # Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  #
 ############################################################################
 # This file is part of DUNE: Unified Navigation Environment.               #
@@ -72,7 +72,7 @@ macro(dune_probe_cxx)
   if(NOT DUNE_CXX_NAME)
     check_symbol_exists(__GNUC__ stdio.h DUNE_CXX_GNU)
     if(DUNE_CXX_GNU)
-      exec_program(${CMAKE_CXX_COMPILER} ARGS -dumpversion OUTPUT_VARIABLE verinfo)
+      exec_program(${CMAKE_CXX_COMPILER} ARGS -dumpfullversion -dumpversion OUTPUT_VARIABLE verinfo)
       string(REPLACE "." ";" gxxver ${verinfo})
       list(GET gxxver 0 gxxmaj)
       list(GET gxxver 1 gxxmin)

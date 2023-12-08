@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -72,6 +72,8 @@ namespace Transports
       float usbl_max_wait;
       //! USBL Modem Announce service.
       bool usbl_announce;
+      //! Section where to read modem addresses
+      std::string addr_section;
     };
 
     struct Task: public DUNE::Tasks::Task
@@ -85,15 +87,13 @@ namespace Transports
       //! Last fuel level confidence.
       float m_fuel_conf;
       //! Sequence number.
-      uint16_t m_seq;
-      //! Last acoustic operation.
-      IMC::AcousticOperation* m_last_acop;
-      //! Vector of pending message requests
-      std::vector<const IMC::AcousticOperation*> m_msg_requests;
+      uint16_t m_reqid;
+      //! Map of messages to send
+      std::map<uint16_t, IMC::AcousticRequest*> m_transmission_requests;
       //! Timer for sending preceding message
       Counter<double> m_msg_send_timer;
-      //! When set should wait and send next message
-      bool m_send_next;
+      //! When "false" processQueue must wait
+      bool m_can_send;
       //! Reporter API.
       Supervisors::Reporter::Client* m_reporter;
       //! USBL Node arguments.
@@ -113,67 +113,71 @@ namespace Transports
         m_progress(0),
         m_fuel_level(0),
         m_fuel_conf(0),
-        m_seq(0),
-        m_last_acop(NULL),
-        m_send_next(false),
+        m_reqid(0),
+        m_can_send(true),
         m_reporter(NULL),
         m_usbl_node(NULL),
         m_usbl_modem(NULL)
       {
         param("Enable Reports", m_args.report_enable)
-        .defaultValue("false")
-        .description("Enable system state acoustic reporting. When enabled, systems"
-                     " shall acknowledge reception of requests to broadcast acoustic"
-                     " messages containing the overall state of the system."
-                     " When disabled, those requests shall be ignored");
+            .defaultValue("false")
+            .description("Enable system state acoustic reporting. When enabled, systems"
+                " shall acknowledge reception of requests to broadcast acoustic"
+                " messages containing the overall state of the system."
+                " When disabled, those requests shall be ignored");
 
         param("USBL Node -- Enabled", m_node_args.enabled)
         .defaultValue("false")
         .description("Enable system's USBL mode. When active, this system will"
-                     " start using USBL by actively broadcasting an acoustic"
-                     " message containing a request to get USBL feedback. The"
-                     " request contains the period for transmissions, if quick"
-                     " (two-way travel) or ranging (three-way travel) mode is"
-                     " desired, and, if in ranging mode (not \"quick\"), to use"
-                     " absolute or relative positioning. If a USBL modem is in"
-                     " reach, they will start exchanging acoustic transmissions"
-                     " to provide USBL positioning to the system."
-                     " Any system can be configured to request USBL information"
-                     " including modems with built-in USBL capabilities");
+            " start using USBL by actively broadcasting an acoustic"
+            " message containing a request to get USBL feedback. The"
+            " request contains the period for transmissions, if quick"
+            " (two-way travel) or ranging (three-way travel) mode is"
+            " desired, and, if in ranging mode (not \"quick\"), to use"
+            " absolute or relative positioning. If a USBL modem is in"
+            " reach, they will start exchanging acoustic transmissions"
+            " to provide USBL positioning to the system."
+            " Any system can be configured to request USBL information"
+            " including modems with built-in USBL capabilities");
 
         param("USBL Node -- Period", m_node_args.period)
         .defaultValue("60.0")
         .minimumValue("2.0")
         .units(Units::Second)
         .description("USBL's period. This value determines the period of USBL"
-                     " positioning data. If \"Quick\" mode is selected, modem"
-                     " shall ping the USBL modem with this period to get bearing"
-                     " and elevation (two-way travel transmission). If \"Quick\""
-                     " mode is disabled, ranging information is included for a"
-                     " proper fix. In this case, the USBL modem pings the node,"
-                     " hears the reply, computes the position and transmits back"
-                     " to the node (three-way travel transmission)");
+            " positioning data. If \"Quick\" mode is selected, modem"
+            " shall ping the USBL modem with this period to get bearing"
+            " and elevation (two-way travel transmission). If \"Quick\""
+            " mode is disabled, ranging information is included for a"
+            " proper fix. In this case, the USBL modem pings the node,"
+            " hears the reply, computes the position and transmits back"
+            " to the node (three-way travel transmission)");
 
         param("USBL Node -- Absolute Fix", m_node_args.fix)
         .defaultValue("false")
         .description("If this argument is enabled, USBL sends an absolute fix using"
-                     " WGS-84 lat/lon coordinates. If disabled, then the positioning"
-                     " is relative to the origin of a system where the center of the"
-                     " reference frame is the USBL modem");
+            " WGS-84 lat/lon coordinates. If disabled, then the positioning"
+            " is relative to the origin of a system where the center of the"
+            " reference frame is the USBL modem");
+
+        param("USBL Node -- Inverted", m_node_args.inverted)
+        .defaultValue("false")
+        .description("If this argument is enabled, USBL node anounces itself"
+            " for inverted positioning by USBL modems.");
 
         param("USBL Node -- Quick, No Range", m_node_args.no_range)
         .defaultValue("false")
         .description("In this mode, the USBL node does not request ranging information."
-                     " Thus, with this mode enabled, there's only a two-way travel"
-                     " transmission between the node and the USBL modem. The node will"
-                     " actively ping the modem to get bearing/elevation information"
-                     " With this mode enabled \"Absolute Fix\" argument is ignored");
+            " Thus, with this mode enabled, there's only a two-way travel"
+            " transmission between the node and the USBL modem. The node will"
+            " actively ping the modem to get bearing/elevation information"
+            " With this mode enabled \"Absolute Fix\" argument is ignored");
 
         param("USBL Modem -- Announce Service", m_args.usbl_announce)
         .defaultValue("false")
         .description("This argument only concerns systems with USBL modems installed."
-                     " This parameter statically adds a USBL announce, even if service"
-                     " has not been detected yet (eg. modem not connected)");
+            " This parameter statically adds a USBL announce, even if service"
+            " has not been detected yet (eg. modem not connected)");
 
         param("USBL Modem -- Max Waiting Time", m_args.usbl_max_wait)
         .defaultValue("10.0")
@@ -181,12 +185,17 @@ namespace Transports
         .maximumValue("20.0")
         .units(Units::Second)
         .description("This argument only concerns systems with USBL modems installed."
-                     " This value establishes the maximum amount of time that the modem"
-                     " waits for the target system's reply");
+            " This value establishes the maximum amount of time that the modem"
+            " waits for the target system's reply");
 
-        bind<IMC::AcousticOperation>(this);
+        param("Address Section", m_args.addr_section)
+        .defaultValue("")
+        .description("Name of the configuration section with modem addresses");
+
+        bind<IMC::AcousticRequest>(this);
         bind<IMC::EstimatedState>(this);
         bind<IMC::FuelLevel>(this);
+        bind<IMC::GpsFix>(this);
         bind<IMC::PlanControlState>(this);
         bind<IMC::ReportControl>(this);
         bind<IMC::UamRxFrame>(this);
@@ -195,6 +204,9 @@ namespace Transports
         bind<IMC::UsblPositionExtended>(this);
         bind<IMC::UsblAnglesExtended>(this);
         bind<IMC::UsblConfig>(this);
+        bind<IMC::AcousticSystemsQuery>(this);
+
+        m_msg_send_timer.setTop(2);
       }
 
       ~Task(void)
@@ -206,7 +218,7 @@ namespace Transports
       onResourceAcquisition(void)
       {
         m_reporter = new Supervisors::Reporter::Client(this, Supervisors::Reporter::IS_ACOUSTIC,
-                                                       2.0, false);
+            2.0, false);
 
         m_usbl_node = new UsblTools::Node(this, &m_node_args);
       }
@@ -230,10 +242,24 @@ namespace Transports
       void
       onResourceRelease(void)
       {
-        clearLastOp();
         Memory::clear(m_reporter);
         Memory::clear(m_usbl_node);
         Memory::clear(m_usbl_modem);
+      }
+
+      void
+      consume(const IMC::AcousticSystemsQuery* msg)
+      {
+        if (m_args.addr_section.empty())
+        {
+          war("Modem address section was not properly set.");
+          return;
+        }
+        AcousticSystems reply;
+        std::vector<std::string> options = m_ctx.config.options(m_args.addr_section);
+        options.erase(std::remove(options.begin(), options.end(), m_ctx.resolver.name()), options.end());
+        reply.list = String::join(options.begin(), options.end(), ",");
+        dispatchReply(*msg, reply);
       }
 
       void
@@ -243,6 +269,15 @@ namespace Transports
           return;
 
         m_estate = *msg;
+      }
+
+      void
+      consume(const IMC::GpsFix* msg)
+      {
+        if (msg->getSource() != getSystemId())
+          return;
+
+        m_usbl_node->consume(msg);
       }
 
       void
@@ -259,41 +294,25 @@ namespace Transports
       }
 
       void
-      consume(const IMC::AcousticOperation* msg)
+      consume(const IMC::AcousticRequest* msg)
       {
-        if (msg->getDestination() != getSystemId())
+        if (msg->getSource() != getSystemId()
+            || msg->getDestination() != getSystemId())
           return;
 
-        switch (msg->op)
-        {
-          case IMC::AcousticOperation::AOP_ABORT:
-            sendAbort(msg->system);
-            break;
-
-          case IMC::AcousticOperation::AOP_RANGE:
-            sendRange(msg->system);
-            break;
-
-          case IMC::AcousticOperation::AOP_MSG:
-            m_msg_requests.push_back((const IMC::AcousticOperation*)msg->clone());
-            // are there more messages being sent?
-            if (m_msg_requests.size() > 1)
-            {
-              IMC::AcousticOperation aop(*msg);
-              aop.op = IMC::AcousticOperation::AOP_MSG_QUEUED;
-              dispatch(aop);
-              return;
-            }
-            else
-            {
-              sendMessage(msg->system, msg->msg);
-            }
-            break;
+        switch(msg->type){
+          case (IMC::AcousticRequest::TYPE_MSG):
+          case (IMC::AcousticRequest::TYPE_ABORT):
+          case (IMC::AcousticRequest::TYPE_RANGE):
+          case (IMC::AcousticRequest::TYPE_RAW):
+          addToQueue((const IMC::AcousticRequest*)msg->clone());
+          processQueue();
+          break;
 
           default:
-            return;
+            inf("Status of transmission %d changed: AcousticRequest->Type not implemented.", msg->req_id);
+            break;
         }
-        replaceLastOp(msg);
       }
 
       void
@@ -364,20 +383,23 @@ namespace Transports
             break;
 
           case CODE_USBL:
+            std::vector<uint8_t> data;
+            data.push_back(CODE_USBL);
             if (UsblTools::toNode(msg->data[2]))
             {
               if (m_usbl_node != NULL)
-                m_usbl_node->parse(imc_addr_src, msg);
+              {
+                if (m_usbl_node->parse(imc_addr_src, msg, data))
+                  sendFrame(msg->sys_src, createInternalId(), data, false);
+              }
             }
             else
             {
               // handle request to USBL modem.
               if (m_usbl_modem != NULL)
               {
-                std::vector<uint8_t> data;
-                data.push_back(CODE_USBL);
-                if (m_usbl_modem->parse(msg, data))
-                  sendFrame(msg->sys_src, data, false);
+                if (m_usbl_modem->parse(imc_addr_src, msg, data))
+                  sendFrame(msg->sys_src, createInternalId(), data, false);
               }
             }
             break;
@@ -393,111 +415,89 @@ namespace Transports
         if (msg->getDestinationEntity() != getEntityId())
           return;
 
-        if (m_last_acop == NULL)
+        if (m_transmission_requests.find(msg->seq)
+            == m_transmission_requests.end()) {
           return;
+        }
+        uint16_t idOfMsg = msg->seq;
 
-        IMC::AcousticOperation aop(*m_last_acop);
+        if (m_transmission_requests.find(idOfMsg) == m_transmission_requests.end()) return;
 
-        switch(msg->value)
-        {
+        const IMC::AcousticRequest* request = m_transmission_requests[idOfMsg];
+
+        switch (msg->value) {
           case IMC::UamTxStatus::UTS_BUSY:
-            aop.op = IMC::AcousticOperation::AOP_BUSY;
+            sendAcousticStatus(request,IMC::AcousticStatus::STATUS_BUSY,msg->error);
+            m_msg_send_timer.setTop(2);
+            m_can_send = true;
             break;
 
           case IMC::UamTxStatus::UTS_INV_ADDR:
-            aop.op = IMC::AcousticOperation::AOP_UNSUPPORTED;
-            if (m_last_acop->op == IMC::AcousticOperation::AOP_MSG)
-            {
-              delete m_msg_requests.front();
-              m_msg_requests.erase(m_msg_requests.begin());
-            }
+            sendAcousticStatus(request,IMC::AcousticStatus::STATUS_UNSUPPORTED,msg->error);
+            removeFromQueue(idOfMsg);
+
             break;
 
           case IMC::UamTxStatus::UTS_DONE:
-            switch(m_last_acop->op)
-            {
-              case IMC::AcousticOperation::AOP_ABORT:
-                aop.op = IMC::AcousticOperation::AOP_ABORT_ACKED;
-                break;
-              case IMC::AcousticOperation::AOP_RANGE:
-                // do nothing.
-                return;
-                break;
-              case IMC::AcousticOperation::AOP_MSG:
-                delete m_msg_requests.front();
-                m_msg_requests.erase(m_msg_requests.begin());
-                aop.op = IMC::AcousticOperation::AOP_MSG_DONE;
-                break;
-            }
+            sendAcousticStatus(request,IMC::AcousticStatus::STATUS_SENT,msg->error);
+            if(request->type != IMC::AcousticRequest::TYPE_RANGE)
+              removeFromQueue(idOfMsg);
             break;
 
           case IMC::UamTxStatus::UTS_IP:
-            switch(m_last_acop->op)
-            {
-              case IMC::AcousticOperation::AOP_ABORT:
-                aop.op = IMC::AcousticOperation::AOP_ABORT_IP;
-                break;
-              case IMC::AcousticOperation::AOP_RANGE:
-                aop.op = IMC::AcousticOperation::AOP_RANGE_IP;
-                break;
-              case IMC::AcousticOperation::AOP_MSG:
-                aop.op = IMC::AcousticOperation::AOP_MSG_IP;
-                break;
-            }
+            sendAcousticStatus(request,IMC::AcousticStatus::STATUS_IN_PROGRESS,msg->error);
+
             break;
 
           case IMC::UamTxStatus::UTS_FAILED:
-            switch(m_last_acop->op)
-            {
-              case IMC::AcousticOperation::AOP_ABORT:
-                aop.op = IMC::AcousticOperation::AOP_ABORT_TIMEOUT;
-                break;
-              case IMC::AcousticOperation::AOP_RANGE:
-                aop.op = IMC::AcousticOperation::AOP_RANGE_TIMEOUT;
-                break;
-              case IMC::AcousticOperation::AOP_MSG:
-                delete m_msg_requests.front();
-                m_msg_requests.erase(m_msg_requests.begin());
-                aop.op = IMC::AcousticOperation::AOP_MSG_FAILURE;
-                break;
-            }
+            sendAcousticStatus(request,IMC::AcousticStatus::STATUS_ERROR,msg->error);
+            removeFromQueue(idOfMsg);
+
             break;
-        }
 
-        dispatch(aop);
+          default:
+            break;
 
-        // If idle send pending messages.
-        if (msg->value != IMC::UamTxStatus::UTS_IP && !m_msg_requests.empty())
-        {
-          // wait (for clearing buffers) and send next message
-          m_msg_send_timer.setTop(2);
-          m_msg_send_timer.reset();
-          m_send_next = true;
         }
       }
 
       void
       consume(const IMC::UamRxRange* msg)
       {
-        if (m_last_acop == NULL)
+        if (m_transmission_requests.find(msg->seq)
+            == m_transmission_requests.end()) {
           return;
-
-        if (m_last_acop->op == IMC::AcousticOperation::AOP_RANGE)
-        {
-          IMC::AcousticOperation aop(*m_last_acop);
-          aop.op = IMC::AcousticOperation::AOP_RANGE_RECVED;
-          aop.range = msg->value;
-          dispatch(aop);
         }
+        uint16_t idOfMsg = msg->seq;
+
+        const IMC::AcousticRequest* request = m_transmission_requests[idOfMsg];
+
+        if(request->type != IMC::AcousticRequest::TYPE_RANGE){
+          return;
+        }
+
+        if(request->destination != msg->sys){
+          return;
+        }
+
+        sendAcousticStatus(request,IMC::AcousticStatus::STATUS_RANGE_RECEIVED,"",msg->value);
+        removeFromQueue(idOfMsg);
       }
 
       void
       consume(const IMC::UsblPositionExtended* msg)
       {
+        debug("Received USBL position for %s.", msg->target.c_str());
+
+        // always dispatch UsblFixExtended.
+        IMC::UsblFixExtended fix = UsblTools::toFix(*msg, m_estate);
+        dispatch(fix);
+        debug("Generated USBL fix to %s.", fix.target.c_str());
+
         if (m_usbl_modem == NULL)
         {
           announceUSBL();
-          m_usbl_modem = new UsblTools::Modem();
+          m_usbl_modem = new UsblTools::Modem(this);
           return;
         }
 
@@ -508,28 +508,39 @@ namespace Transports
         std::vector<uint8_t> data;
         data.push_back(CODE_USBL);
 
+        // Inverted mode
+        if(m_usbl_modem->isInverted(msg->target, data))
+        {
+          m_usbl_modem->consume(msg);
+
+          if (m_usbl_modem->invertedFix(msg->target, fix))
+            dispatch(fix);
+
+          return;
+        }
+
         // The target wants an absolute fix?
         if (m_usbl_modem->wantsFix(msg->target))
         {
-          // transform data.
-          IMC::UsblFixExtended fix = UsblTools::toFix(*msg, m_estate);
           if (m_usbl_modem->encode(&fix, data))
-            sendFrame(msg->target, data, false);
+            sendFrame(msg->target, createInternalId(), data, false);
         }
         else
         {
           if (m_usbl_modem->encode(msg, data))
-            sendFrame(msg->target, data, false);
+            sendFrame(msg->target, createInternalId(), data, false);
         }
       }
 
       void
       consume(const IMC::UsblAnglesExtended* msg)
       {
+      	debug("Received USBL angles to %s.", msg->target.c_str());
+
         if (m_usbl_modem == NULL)
         {
           announceUSBL();
-          m_usbl_modem = new UsblTools::Modem();
+          m_usbl_modem = new UsblTools::Modem(this);
           return;
         }
 
@@ -539,8 +550,12 @@ namespace Transports
 
         std::vector<uint8_t> data;
         data.push_back(CODE_USBL);
+        
+        if(m_usbl_modem->isInverted(msg->target, data))
+          return;
+
         if (m_usbl_modem->encode(msg, data))
-          sendFrame(msg->target, data, false);
+          sendFrame(msg->target, createInternalId(), data, false);
       }
 
       void
@@ -557,237 +572,58 @@ namespace Transports
           m_reporter->consume(msg);
       }
 
+      void
+      sendAcousticStatus(const AcousticRequest* acReq, IMC::AcousticStatus::StatusEnum status,
+          const std::string& info = "", const fp32_t range = 0.0) {
+        IMC::AcousticStatus acStat;
+
+        acStat.req_id    = acReq->req_id;
+        acStat.type      = acReq->type;
+        acStat.status    = status;
+        acStat.range     = range;
+        acStat.info      = info;
+        acStat.setDestination(acReq->getSource());
+        acStat.setDestinationEntity(acReq->getSourceEntity());
+
+        dispatch(acStat);
+      }
+
+      uint16_t
+      createInternalId(){
+        if(m_reqid==0xFFFF){
+          m_reqid=0;
+        }
+        else{
+          m_reqid++;
+        }
+        return m_reqid;
+      }
+
+      //! Add message to the end of queue
+      void
+      addToQueue(const IMC::AcousticRequest* msg)
+      {
+        m_transmission_requests[createInternalId()] = msg->clone();
+      }
+
+      //! Remove message from the queue. Resets timer. And unlocks the queue
+      void
+      removeFromQueue(uint16_t index)
+      {
+        delete m_transmission_requests.find(index)->second;
+        m_transmission_requests.erase(index);
+        m_msg_send_timer.setTop(2);
+        m_can_send = true;
+      }
+
       //! Announce USBL service.
       void
       announceUSBL(void)
       {
         IMC::AnnounceService announce;
         announce.service = std::string("imc+any://acoustic/usbl/")
-        + URL::encode(getEntityLabel());
+            + URL::encode(getEntityLabel());
         dispatch(announce);
-      }
-
-      //! Clear last operation.
-      void
-      clearLastOp(void)
-      {
-        Memory::clear(m_last_acop);
-      }
-
-      void
-      sendFrame(const std::string& sys, Codes code, bool ack)
-      {
-        std::vector<uint8_t> data;
-        data.push_back(code);
-        sendFrame(sys, data, ack);
-      }
-
-      void
-      sendFrame(const std::string& sys, const std::vector<uint8_t>& data, bool ack)
-      {
-        Algorithms::CRC8 crc(c_poly);
-
-        IMC::UamTxFrame frame;
-        frame.setDestination(getSystemId());
-        frame.sys_dst = sys;
-        frame.seq = m_seq++;
-        frame.flags = ack ? IMC::UamTxFrame::UTF_ACK : 0;
-
-        frame.data.push_back(c_sync);
-        crc.putByte(c_sync);
-        for (size_t i = 0; i < data.size(); ++i)
-        {
-          frame.data.push_back(data[i]);
-          crc.putByte(data[i]);
-        }
-        frame.data.push_back(crc.get());
-
-        dispatch(frame);
-      }
-
-      void
-      replaceLastOp(const IMC::AcousticOperation* msg)
-      {
-        clearLastOp();
-        m_last_acop = static_cast<IMC::AcousticOperation*>(msg->clone());
-        m_last_acop->setDestination(m_last_acop->getSource());
-        m_last_acop->setDestinationEntity(m_last_acop->getSourceEntity());
-        m_last_acop->setSource(getSystemId());
-        m_last_acop->setSourceEntity(getEntityId());
-      }
-
-      void
-      sendAbort(const std::string& sys)
-      {
-        sendFrame(sys, CODE_ABORT, true);
-      }
-
-      void
-      recvAbort(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
-      {
-        (void)msg;
-
-        // ignore aborts addressed to other systems
-        if (imc_dst != getSystemId())
-        {
-          inf(DTR("ignoring abort message addressed to other system"));
-          return;
-        }
-
-        war(DTR("got abort request"));
-
-        IMC::Abort abort;
-        abort.setSource(imc_src);
-        abort.setDestination(imc_dst);
-        dispatch(abort);
-      }
-
-      void
-      sendRange(const std::string& sys)
-      {
-        spew("sending range to %s", sys.c_str());
-        sendFrame(sys, CODE_RANGE, true);
-      }
-
-      void
-      recvRange(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
-      {
-        (void)imc_src;
-        (void)imc_dst;
-        (void)msg;
-      }
-
-      void
-      sendMessage(const std::string& sys, const InlineMessage<IMC::Message>& imsg)
-      {
-        const IMC::Message* msg = NULL;
-
-        try
-        {
-          msg = imsg.get();
-        }
-        catch (...)
-        {
-          return;
-        }
-
-        // Check if special command can be used...
-        if (msg->getId() == IMC::PlanControl::getIdStatic())
-        {
-          const IMC::PlanControl * pc = static_cast<const IMC::PlanControl*>(msg);
-          if (pc->arg.isNull())
-          {
-            sendPlanControl(sys, static_cast<const IMC::PlanControl*>(msg));
-            return;
-          }
-        }
-
-        // For all other cases, send the raw message across
-        sendRawMessage(sys, msg);
-      }
-
-      void
-      recvMessage(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
-      {
-        debug("Parsing message received via acoustic message.");
-
-        try
-        {
-          uint16_t msg_type;
-          std::memcpy(&msg_type, &msg->data[2], sizeof(uint16_t));
-          Message *m = IMC::Factory::produce(msg_type);
-          if (m == NULL)
-          {
-            err("Invalid message type received: %d", msg_type);
-            return;
-          }
-
-          m->setSource(imc_src);
-          m->setDestination(imc_dst);
-          m->setTimeStamp(msg->getTimeStamp());
-          m->deserializeFields((const unsigned char *)&msg->data[4], msg->data.size()-4);
-          dispatch(m, DF_KEEP_TIME | DF_LOOP_BACK);
-          debug("Acoustic message successfully parsed as '%s'.", m->getName());
-        }
-        catch (std::exception& ex) {
-          err("Error parsing raw message from UAM frame: %s.", ex.what());
-        }
-      }
-
-      void
-      sendRawMessage(const std::string& sys, const IMC::Message * msg)
-      {
-        std::vector<uint8_t> data;
-        data.push_back(CODE_RAW);
-
-        // leave 1 byte for CODE_RAW and another for CRC8
-        uint8_t buf[1022];
-
-        // start with message id
-        uint16_t id = msg->getId();
-        std::memcpy(&buf[0], &id, sizeof(uint16_t));
-
-        // followed by all message fields
-        uint8_t* end = msg->serializeFields(&buf[2]);
-
-        int length = end - buf;
-        data.insert(data.end(), buf, buf + length);
-        sendFrame(sys, data, true);
-      }
-
-      void
-      sendPlanControl(const std::string& sys, const IMC::PlanControl* msg)
-      {
-        if (msg->type != IMC::PlanControl::PC_REQUEST)
-          return;
-
-        if (msg->op != IMC::PlanControl::PC_START)
-          return;
-
-        std::vector<uint8_t> data;
-        data.push_back(CODE_PLAN);
-        for (size_t i = 0; i < msg->plan_id.size(); ++i)
-          data.push_back((uint8_t)msg->plan_id[i]);
-        sendFrame(sys, data, true);
-      }
-
-      void
-      recvPlanControl(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
-      {
-        IMC::OperationalLimits ol;
-        ol.setDestination(imc_dst);
-        ol.setSource(imc_src);
-        ol.mask = 0;
-        dispatch(ol);
-
-        Delay::wait(1.0);
-
-        IMC::PlanControl pc;
-        pc.setSource(imc_src);
-        pc.type = IMC::PlanControl::PC_REQUEST;
-        pc.op = IMC::PlanControl::PC_START;
-        pc.plan_id.assign(&msg->data[2], msg->data.size() - 3);
-        pc.flags = IMC::PlanControl::FLG_IGNORE_ERRORS;
-        dispatch(pc);
-
-        war(DTR("start plan detected"));
-      }
-
-      void
-      sendRestartSystem(const std::string& sys, const IMC::RestartSystem* msg)
-      {
-        (void)msg;
-        sendFrame(sys, CODE_RESTART, true);
-      }
-
-      void
-      recvRestartSystem(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
-      {
-        (void)msg;
-        IMC::RestartSystem restart;
-        restart.setSource(imc_src);
-        restart.setDestination(imc_dst);
-        dispatch(restart);
       }
 
       void
@@ -811,7 +647,265 @@ namespace Transports
         data.resize(sizeof(dat) + 1);
         data[0] = CODE_REPORT;
         std::memcpy(&data[1], &dat, sizeof(dat));
-        sendFrame("broadcast", data, false);
+        sendFrame("broadcast", createInternalId(), data, false);
+      }
+
+      void
+      sendFrame(const std::string& sys, const uint16_t id, const std::vector<uint8_t>& data, bool ack)
+      {
+        Algorithms::CRC8 crc(c_poly);
+
+        IMC::UamTxFrame frame;
+        frame.setSource(getSystemId());
+        frame.setSourceEntity(getEntityId());
+        frame.setDestination(getSystemId());
+        frame.sys_dst = sys;
+        frame.seq = id;
+        frame.flags = ack ? IMC::UamTxFrame::UTF_ACK : 0;
+
+        frame.data.push_back(c_sync);
+        crc.putByte(c_sync);
+        for (size_t i = 0; i < data.size(); ++i)
+        {
+          frame.data.push_back(data[i]);
+          crc.putByte(data[i]);
+        }
+        frame.data.push_back(crc.get());
+
+        dispatch(frame);
+      }
+
+      void
+      sendFrameRaw(const std::string& sys, const uint16_t id, const std::vector<uint8_t>& data, bool ack)
+      {
+        IMC::UamTxFrame frame;
+        frame.setSource(getSystemId());
+        frame.setSourceEntity(getEntityId());
+        frame.setDestination(getSystemId());
+        frame.sys_dst = sys;
+        frame.seq = id;
+        frame.flags = ack ? IMC::UamTxFrame::UTF_ACK : 0;
+
+        for (size_t i = 0; i < data.size(); ++i)
+        {
+          frame.data.push_back(data[i]);
+        }
+
+        dispatch(frame);
+      }
+
+      void
+      sendAbort(const std::string& sys, const uint16_t id)
+      {
+        std::vector<uint8_t> data;
+        data.push_back(CODE_ABORT);
+        sendFrame(sys, id, data, true);
+      }
+
+      void
+      sendRange(const std::string& sys, const uint16_t id)
+      {
+        spew("sending range to %s", sys.c_str());
+        std::vector<uint8_t> data;
+        data.push_back(CODE_RANGE);
+        sendFrame(sys, id, data, true);
+      }
+
+      void
+      sendMessage(const std::string& sys, const uint16_t id, const InlineMessage<IMC::Message>& imsg)
+      {
+        const IMC::Message* msg = NULL;
+
+        try
+        {
+          msg = imsg.get();
+        }
+        catch (...)
+        {
+          return;
+        }
+
+        // Check if special command can be used...
+        if (msg->getId() == IMC::PlanControl::getIdStatic())
+        {
+          const IMC::PlanControl * pc = static_cast<const IMC::PlanControl*>(msg);
+          if (pc->arg.isNull())
+          {
+            sendPlanControl(sys, id, static_cast<const IMC::PlanControl*>(msg));
+            return;
+          }
+        }
+
+        // For all other cases, send the raw message across
+        sendRawMessage(sys, id, msg);
+      }
+
+      void
+      sendRawMessage(const std::string& sys, const uint16_t id, const IMC::Message * msg)
+      {
+        std::vector<uint8_t> data;
+        data.push_back(CODE_RAW);
+
+        inf("Send message of type %s, with serialization size %d.", msg->getName(), msg->getSerializationSize());
+
+        // leave 1 byte for CODE_RAW and another for CRC8
+        uint8_t buf[2500];
+
+        // start with message id
+        uint16_t id2 = msg->getId();
+        std::memcpy(&buf[0], &id2, sizeof(uint16_t));
+
+        // followed by all message fields
+        msg->serializeFields(&buf[2]);
+
+        int length = msg->getSerializationSize() + 2;
+        data.insert(data.end(), buf, buf + length);
+        sendFrame(sys, id, data, true);
+      }
+
+      void
+      sendRaw(const IMC::AcousticRequest& req, const std::string& sys, const uint16_t id, const InlineMessage<IMC::Message>& imsg)
+      {
+        const IMC::Message* msg = NULL;
+
+        try
+        {
+          msg = imsg.get();
+        }
+        catch (...)
+        {
+          sendAcousticStatus(&req, IMC::AcousticStatus::STATUS_INPUT_FAILURE, "Null pointer.");
+          removeFromQueue(req.req_id);
+          return;
+        }
+
+        // Check if is DevDataBinary...
+        if (msg->getId() == IMC::DevDataBinary::getIdStatic())
+        {
+          const IMC::DevDataBinary * ddb = static_cast<const IMC::DevDataBinary*>(msg);
+          if (ddb->value.size() > 0)
+          {
+            std::vector<uint8_t> data;
+            // no coding, send as is
+            for (size_t i = 0; i < ddb->value.size(); ++i)
+            {
+              data.push_back(ddb->value[i]);
+            }
+
+            sendFrameRaw(sys, id, data, true);
+            return;
+          }
+        }
+
+        sendAcousticStatus(&req, IMC::AcousticStatus::STATUS_UNSUPPORTED, "Unsupported type for raw send.");
+        removeFromQueue(req.req_id);
+      }
+
+      void
+      sendPlanControl(const std::string& sys, const uint16_t id, const IMC::PlanControl* msg)
+      {
+        if (msg->type != IMC::PlanControl::PC_REQUEST)
+          return;
+
+        if (msg->op != IMC::PlanControl::PC_START)
+          return;
+
+        std::vector<uint8_t> data;
+        data.push_back(CODE_PLAN);
+        for (size_t i = 0; i < msg->plan_id.size(); ++i)
+          data.push_back((uint8_t)msg->plan_id[i]);
+        sendFrame(sys, id, data, true);
+      }
+
+      void
+      recvAbort(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
+      {
+        (void)msg;
+
+        // ignore aborts addressed to other systems
+        if (imc_dst != getSystemId())
+        {
+          inf(DTR("ignoring abort message addressed to other system"));
+          return;
+        }
+
+        war(DTR("got abort request"));
+
+        IMC::Abort abort;
+        abort.setSource(imc_src);
+        abort.setDestination(imc_dst);
+        dispatch(abort);
+      }
+
+      void
+      recvRange(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
+      {
+        (void)imc_src;
+        (void)imc_dst;
+        (void)msg;
+      }
+
+      void
+      recvMessage(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
+      {
+        debug("Parsing message received via acoustic message.");
+
+        try
+        {
+          uint16_t msg_type;
+          std::memcpy(&msg_type, &msg->data[2], sizeof(uint16_t));
+          Message *m = IMC::Factory::produce(msg_type);
+          if (m == NULL)
+          {
+            err("Invalid message type received: %d", msg_type);
+            return;
+          }
+
+          m->setSource(imc_src);
+          m->setDestination(imc_dst);
+          m->setTimeStamp(msg->getTimeStamp());
+          m->deserializeFields((const unsigned char *)&msg->data[4], msg->data.size()-4);
+
+          // mark the message's origin as acoustic if it is an acoustic command
+          if (m->getId() == IMC::TextMessage::getIdStatic())
+          {
+        	IMC::TextMessage* txtmsg = static_cast<IMC::TextMessage*>(m);
+        	std::stringstream ss;
+        	ss << "acoustic/" << msg->sys_src;
+        	txtmsg->origin = ss.str();
+          }
+
+          dispatch(m, DF_KEEP_TIME | DF_LOOP_BACK);
+          debug("Acoustic message successfully parsed as '%s'.", m->getName());
+        }
+        catch (std::exception& ex) {
+          err("Error parsing raw message from UAM frame: %s.", ex.what());
+        }
+      }
+
+      void
+      recvPlanControl(uint16_t imc_src, uint16_t imc_dst, const IMC::UamRxFrame* msg)
+      {
+        IMC::OperationalLimits ol;
+        ol.setSource(imc_src);
+        ol.setDestination(imc_dst);
+        ol.mask = 0;
+        dispatch(ol);
+
+        Delay::wait(1.0);
+
+        IMC::PlanControl pc;
+        pc.setSource(imc_src);
+        pc.setDestination(imc_dst);
+        pc.type = IMC::PlanControl::PC_REQUEST;
+        pc.op = IMC::PlanControl::PC_START;
+        pc.plan_id.assign(&msg->data[2], msg->data.size() - 3);
+        pc.flags = IMC::PlanControl::FLG_IGNORE_ERRORS;
+        dispatch(pc);
+
+        war(DTR("start plan detected with id: %s for 0x%02X"),
+            pc.plan_id.c_str(),
+            pc.getDestination() & 0xFFFF);
       }
 
       void
@@ -847,12 +941,16 @@ namespace Transports
       void
       onUsblModem(void)
       {
-        if (m_usbl_modem != NULL)
+        // Trigger target.
+        std::string sys;
+        if (m_usbl_modem->run(sys, m_args.usbl_max_wait))
         {
-          // Trigger target.
-          std::string sys;
-          if (m_usbl_modem->run(sys, m_args.usbl_max_wait))
-            sendRange(sys);
+          std::vector<uint8_t> data;
+          data.push_back(CODE_USBL);
+          if (m_usbl_modem->isInverted(sys, data))
+            sendFrame(sys, createInternalId(), data, true);
+          else
+            sendRange(sys,createInternalId());
         }
       }
 
@@ -860,12 +958,62 @@ namespace Transports
       void
       onUsblNode(void)
       {
-        if (m_usbl_node != NULL)
+        std::vector<uint8_t> data;
+        data.push_back(CODE_USBL);
+        if (m_usbl_node->run(data))
+          sendFrame("broadcast", createInternalId(), data, false);
+      }
+
+      void
+      clearTimeouts()
+      {
+        std::map<uint16_t, IMC::AcousticRequest*>::iterator it;
+        it = m_transmission_requests.begin();
+
+        while (it != m_transmission_requests.end())
         {
-          std::vector<uint8_t> data;
-          data.push_back(CODE_USBL);
-          if (m_usbl_node->run(data))
-            sendFrame("broadcast", data, false);
+          if (it->second->getTimeStamp() + it->second->timeout <= Clock::getSinceEpoch())
+          {
+            sendAcousticStatus(it->second,IMC::AcousticStatus::STATUS_INPUT_FAILURE,"Transmission timed out.");
+            Memory::clear(it->second);
+            m_transmission_requests.erase(it++);
+            m_can_send = true;
+          }
+          else
+            ++it;
+        }
+      }
+
+      void
+      processQueue(void)
+      {
+        if (m_can_send && !m_transmission_requests.empty())
+        {
+          m_can_send = false;
+          const IMC::AcousticRequest* req = m_transmission_requests.begin()->second;
+          uint16_t id = m_transmission_requests.begin()->first;
+
+          switch (req->type)
+          {
+            case (IMC::AcousticRequest::TYPE_ABORT):
+              sendAbort(req->destination,id);
+              break;
+
+            case (IMC::AcousticRequest::TYPE_RANGE):
+              sendRange(req->destination,id);
+              break;
+
+            case (IMC::AcousticRequest::TYPE_MSG):
+              sendMessage(req->destination, id, req->msg);
+              break;
+
+            case (IMC::AcousticRequest::TYPE_RAW):
+              sendRaw(*req, req->destination, id, req->msg);
+              break;
+
+            default:
+              break;
+          }
         }
       }
 
@@ -877,21 +1025,15 @@ namespace Transports
         {
           waitForMessages(1.0);
 
-          onUsblModem();
-          onUsblNode();
-
-          if (m_args.report_enable)
-          {
+          if (m_usbl_modem != NULL) onUsblModem();
+          if (m_usbl_node != NULL) onUsblNode();
+          if (m_args.report_enable) {
             if (m_reporter != NULL && m_reporter->trigger())
               sendReport();
           }
-
-          if (m_send_next && m_msg_send_timer.overflow())
-          {
-            m_send_next = false;
-            const IMC::AcousticOperation * req = m_msg_requests.at(0);
-            replaceLastOp(req);
-            sendMessage(req->system, req->msg);
+          if(m_msg_send_timer.overflow()){
+            clearTimeouts();
+            processQueue();
           }
         }
       }

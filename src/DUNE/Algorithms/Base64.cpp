@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -31,6 +31,8 @@
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
+#include <regex>
+
 
 // DUNE headers.
 #include <DUNE/Algorithms/Base64.hpp>
@@ -43,6 +45,8 @@ namespace DUNE
     static const std::string c_b64_en = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                         "abcdefghijklmnopqrstuvwxyz"
                                         "0123456789+/";
+    //! Base64 regular expression
+    static const char* c_b64_regex = "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$";
 
     //! Base64 decoding table.
     static const unsigned char c_b64_de[] =
@@ -59,6 +63,14 @@ namespace DUNE
       66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,
       66,66,66,66,66,66
     };
+
+    //! Verify if string is a valid Base64
+    bool
+    Base64::validBase64(const  char* str)
+    {
+      std::basic_regex<char> b64_expr(c_b64_regex, std::regex_constants::extended);
+      return (std::regex_match(str, b64_expr));
+    }
 
     //! Encode a sequence of bytes in Base64.
     std::string

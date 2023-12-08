@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: d292e724592557940354dddbfc5a9d32                            *
+// IMC XML MD5: 0f425402b735f36a64d579da7bb4baf3                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -94,7 +94,7 @@ namespace DUNE
 
       EntityState(void);
 
-      Message*
+      EntityState*
       clone(void) const
       {
         return new EntityState(*this);
@@ -159,7 +159,7 @@ namespace DUNE
 
       QueryEntityState(void);
 
-      Message*
+      QueryEntityState*
       clone(void) const
       {
         return new QueryEntityState(*this);
@@ -222,7 +222,7 @@ namespace DUNE
 
       EntityInfo(void);
 
-      Message*
+      EntityInfo*
       clone(void) const
       {
         return new EntityInfo(*this);
@@ -295,7 +295,7 @@ namespace DUNE
 
       QueryEntityInfo(void);
 
-      Message*
+      QueryEntityInfo*
       clone(void) const
       {
         return new QueryEntityInfo(*this);
@@ -373,7 +373,7 @@ namespace DUNE
 
       EntityList(void);
 
-      Message*
+      EntityList*
       clone(void) const
       {
         return new EntityList(*this);
@@ -440,7 +440,7 @@ namespace DUNE
 
       CpuUsage(void);
 
-      Message*
+      CpuUsage*
       clone(void) const
       {
         return new CpuUsage(*this);
@@ -509,7 +509,7 @@ namespace DUNE
 
       TransportBindings(void);
 
-      Message*
+      TransportBindings*
       clone(void) const
       {
         return new TransportBindings(*this);
@@ -565,6 +565,17 @@ namespace DUNE
     class RestartSystem: public Message
     {
     public:
+      //! Restart Type.
+      enum RestartTypeEnum
+      {
+        //! Dune.
+        RSTYPE_DUNE = 1,
+        //! System.
+        RSTYPE_SYSTEM = 2
+      };
+
+      //! Restart Type.
+      uint8_t type;
 
       static uint16_t
       getIdStatic(void)
@@ -574,7 +585,7 @@ namespace DUNE
 
       RestartSystem(void);
 
-      Message*
+      RestartSystem*
       clone(void) const
       {
         return new RestartSystem(*this);
@@ -582,6 +593,9 @@ namespace DUNE
 
       void
       clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
 
       int
       validate(void) const;
@@ -610,8 +624,11 @@ namespace DUNE
       unsigned
       getFixedSerializationSize(void) const
       {
-        return 0;
+        return 1;
       }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
     //! Device Calibration Control.
@@ -642,7 +659,7 @@ namespace DUNE
 
       DevCalibrationControl(void);
 
-      Message*
+      DevCalibrationControl*
       clone(void) const
       {
         return new DevCalibrationControl(*this);
@@ -724,7 +741,7 @@ namespace DUNE
 
       DevCalibrationState(void);
 
-      Message*
+      DevCalibrationState*
       clone(void) const
       {
         return new DevCalibrationState(*this);
@@ -814,7 +831,7 @@ namespace DUNE
 
       EntityActivationState(void);
 
-      Message*
+      EntityActivationState*
       clone(void) const
       {
         return new EntityActivationState(*this);
@@ -879,7 +896,7 @@ namespace DUNE
 
       QueryEntityActivationState(void);
 
-      Message*
+      QueryEntityActivationState*
       clone(void) const
       {
         return new QueryEntityActivationState(*this);
@@ -979,7 +996,7 @@ namespace DUNE
 
       VehicleOperationalLimits(void);
 
-      Message*
+      VehicleOperationalLimits*
       clone(void) const
       {
         return new VehicleOperationalLimits(*this);
@@ -1040,7 +1057,7 @@ namespace DUNE
 
       MsgList(void);
 
-      Message*
+      MsgList*
       clone(void) const
       {
         return new MsgList(*this);
@@ -1157,7 +1174,7 @@ namespace DUNE
 
       SimulatedState(void);
 
-      Message*
+      SimulatedState*
       clone(void) const
       {
         return new SimulatedState(*this);
@@ -1229,7 +1246,7 @@ namespace DUNE
 
       LeakSimulation(void);
 
-      Message*
+      LeakSimulation*
       clone(void) const
       {
         return new LeakSimulation(*this);
@@ -1311,7 +1328,7 @@ namespace DUNE
 
       UASimulation(void);
 
-      Message*
+      UASimulation*
       clone(void) const
       {
         return new UASimulation(*this);
@@ -1393,7 +1410,7 @@ namespace DUNE
 
       DynamicsSimParam(void);
 
-      Message*
+      DynamicsSimParam*
       clone(void) const
       {
         return new DynamicsSimParam(*this);
@@ -1456,7 +1473,7 @@ namespace DUNE
 
       StorageUsage(void);
 
-      Message*
+      StorageUsage*
       clone(void) const
       {
         return new StorageUsage(*this);
@@ -1542,7 +1559,7 @@ namespace DUNE
 
       CacheControl(void);
 
-      Message*
+      CacheControl*
       clone(void) const
       {
         return new CacheControl(*this);
@@ -1644,7 +1661,7 @@ namespace DUNE
 
       LoggingControl(void);
 
-      Message*
+      LoggingControl*
       clone(void) const
       {
         return new LoggingControl(*this);
@@ -1732,7 +1749,7 @@ namespace DUNE
 
       LogBookEntry(void);
 
-      Message*
+      LogBookEntry*
       clone(void) const
       {
         return new LogBookEntry(*this);
@@ -1816,7 +1833,7 @@ namespace DUNE
 
       LogBookControl(void);
 
-      Message*
+      LogBookControl*
       clone(void) const
       {
         return new LogBookControl(*this);
@@ -1914,7 +1931,7 @@ namespace DUNE
 
       ReplayControl(void);
 
-      Message*
+      ReplayControl*
       clone(void) const
       {
         return new ReplayControl(*this);
@@ -2002,7 +2019,7 @@ namespace DUNE
 
       ClockControl(void);
 
-      Message*
+      ClockControl*
       clone(void) const
       {
         return new ClockControl(*this);
@@ -2067,7 +2084,7 @@ namespace DUNE
 
       HistoricCTD(void);
 
-      Message*
+      HistoricCTD*
       clone(void) const
       {
         return new HistoricCTD(*this);
@@ -2136,7 +2153,7 @@ namespace DUNE
 
       HistoricTelemetry(void);
 
-      Message*
+      HistoricTelemetry*
       clone(void) const
       {
         return new HistoricTelemetry(*this);
@@ -2220,7 +2237,7 @@ namespace DUNE
 
       HistoricSonarData(void);
 
-      Message*
+      HistoricSonarData*
       clone(void) const
       {
         return new HistoricSonarData(*this);
@@ -2298,7 +2315,7 @@ namespace DUNE
 
       HistoricEvent(void);
 
-      Message*
+      HistoricEvent*
       clone(void) const
       {
         return new HistoricEvent(*this);
@@ -2350,6 +2367,179 @@ namespace DUNE
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
+    //! Profile Sample.
+    class ProfileSample: public Message
+    {
+    public:
+      //! Depth.
+      uint16_t depth;
+      //! Average.
+      fp32_t avg;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 112;
+      }
+
+      ProfileSample(void);
+
+      ProfileSample*
+      clone(void) const
+      {
+        return new ProfileSample(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return ProfileSample::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "ProfileSample";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 6;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Vertical Profile.
+    class VerticalProfile: public Message
+    {
+    public:
+      //! Parameter.
+      enum ParameterEnum
+      {
+        //! Temperature.
+        PROF_TEMPERATURE = 0,
+        //! Salinity.
+        PROF_SALINITY = 1,
+        //! Conductivity.
+        PROF_CONDUCTIVITY = 2,
+        //! pH.
+        PROF_PH = 3,
+        //! Redox.
+        PROF_REDOX = 4,
+        //! Chlorophyll.
+        PROF_CHLOROPHYLL = 5,
+        //! Turbidity.
+        PROF_TURBIDITY = 6
+      };
+
+      //! Parameter.
+      uint8_t parameter;
+      //! Number of Samples.
+      uint8_t numsamples;
+      //! Samples.
+      MessageList<ProfileSample> samples;
+      //! Latitude.
+      fp64_t lat;
+      //! Longitude.
+      fp64_t lon;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 111;
+      }
+
+      VerticalProfile(void);
+
+      VerticalProfile*
+      clone(void) const
+      {
+        return new VerticalProfile(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return VerticalProfile::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "VerticalProfile";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 18;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return samples.getSerializationSize();
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
+    };
+
     //! Heartbeat.
     class Heartbeat: public Message
     {
@@ -2363,7 +2553,7 @@ namespace DUNE
 
       Heartbeat(void);
 
-      Message*
+      Heartbeat*
       clone(void) const
       {
         return new Heartbeat(*this);
@@ -2430,7 +2620,7 @@ namespace DUNE
 
       Announce(void);
 
-      Message*
+      Announce*
       clone(void) const
       {
         return new Announce(*this);
@@ -2508,7 +2698,7 @@ namespace DUNE
 
       AnnounceService(void);
 
-      Message*
+      AnnounceService*
       clone(void) const
       {
         return new AnnounceService(*this);
@@ -2575,7 +2765,7 @@ namespace DUNE
 
       RSSI(void);
 
-      Message*
+      RSSI*
       clone(void) const
       {
         return new RSSI(*this);
@@ -2642,7 +2832,7 @@ namespace DUNE
 
       VSWR(void);
 
-      Message*
+      VSWR*
       clone(void) const
       {
         return new VSWR(*this);
@@ -2709,7 +2899,7 @@ namespace DUNE
 
       LinkLevel(void);
 
-      Message*
+      LinkLevel*
       clone(void) const
       {
         return new LinkLevel(*this);
@@ -2780,7 +2970,7 @@ namespace DUNE
 
       Sms(void);
 
-      Message*
+      Sms*
       clone(void) const
       {
         return new Sms(*this);
@@ -2853,7 +3043,7 @@ namespace DUNE
 
       SmsTx(void);
 
-      Message*
+      SmsTx*
       clone(void) const
       {
         return new SmsTx(*this);
@@ -2922,7 +3112,7 @@ namespace DUNE
 
       SmsRx(void);
 
-      Message*
+      SmsRx*
       clone(void) const
       {
         return new SmsRx(*this);
@@ -3012,7 +3202,7 @@ namespace DUNE
 
       SmsState(void);
 
-      Message*
+      SmsState*
       clone(void) const
       {
         return new SmsState(*this);
@@ -3081,7 +3271,7 @@ namespace DUNE
 
       TextMessage(void);
 
-      Message*
+      TextMessage*
       clone(void) const
       {
         return new TextMessage(*this);
@@ -3156,7 +3346,7 @@ namespace DUNE
 
       IridiumMsgRx(void);
 
-      Message*
+      IridiumMsgRx*
       clone(void) const
       {
         return new IridiumMsgRx(*this);
@@ -3229,7 +3419,7 @@ namespace DUNE
 
       IridiumMsgTx(void);
 
-      Message*
+      IridiumMsgTx*
       clone(void) const
       {
         return new IridiumMsgTx(*this);
@@ -3297,7 +3487,9 @@ namespace DUNE
         //! Message is currently being transmitted.
         TXSTATUS_TRANSMIT = 4,
         //! Message's TTL has expired. Transmition cancelled..
-        TXSTATUS_EXPIRED = 5
+        TXSTATUS_EXPIRED = 5,
+        //! No more messages to be transmitted or received..
+        TXSTATUS_EMPTY = 6
       };
 
       //! Request Identifier.
@@ -3315,7 +3507,7 @@ namespace DUNE
 
       IridiumTxStatus(void);
 
-      Message*
+      IridiumTxStatus*
       clone(void) const
       {
         return new IridiumTxStatus(*this);
@@ -3384,7 +3576,7 @@ namespace DUNE
 
       GroupMembershipState(void);
 
-      Message*
+      GroupMembershipState*
       clone(void) const
       {
         return new GroupMembershipState(*this);
@@ -3472,7 +3664,7 @@ namespace DUNE
 
       SystemGroup(void);
 
-      Message*
+      SystemGroup*
       clone(void) const
       {
         return new SystemGroup(*this);
@@ -3541,7 +3733,7 @@ namespace DUNE
 
       LinkLatency(void);
 
-      Message*
+      LinkLatency*
       clone(void) const
       {
         return new LinkLatency(*this);
@@ -3610,7 +3802,7 @@ namespace DUNE
 
       ExtendedRSSI(void);
 
-      Message*
+      ExtendedRSSI*
       clone(void) const
       {
         return new ExtendedRSSI(*this);
@@ -3683,7 +3875,7 @@ namespace DUNE
 
       HistoricData(void);
 
-      Message*
+      HistoricData*
       clone(void) const
       {
         return new HistoricData(*this);
@@ -3772,7 +3964,7 @@ namespace DUNE
 
       CompressedHistory(void);
 
-      Message*
+      CompressedHistory*
       clone(void) const
       {
         return new CompressedHistory(*this);
@@ -3851,7 +4043,7 @@ namespace DUNE
 
       HistoricSample(void);
 
-      Message*
+      HistoricSample*
       clone(void) const
       {
         return new HistoricSample(*this);
@@ -3951,7 +4143,7 @@ namespace DUNE
 
       HistoricDataQuery(void);
 
-      Message*
+      HistoricDataQuery*
       clone(void) const
       {
         return new HistoricDataQuery(*this);
@@ -4040,7 +4232,7 @@ namespace DUNE
 
       RemoteCommand(void);
 
-      Message*
+      RemoteCommand*
       clone(void) const
       {
         return new RemoteCommand(*this);
@@ -4108,6 +4300,253 @@ namespace DUNE
       setDestinationEntityNested(uint8_t value__);
     };
 
+    //! Communication Systems Query.
+    class CommSystemsQuery: public Message
+    {
+    public:
+      //! Model.
+      enum ModelEnum
+      {
+        //! unknown.
+        CIQ_UNKNOWN = 0x00,
+        //! 3DR.
+        CIQ_M3DR = 0x01,
+        //! RDFXXXxPtP.
+        CIQ_RDFXXXXPTP = 0x02
+      };
+
+      //! Type.
+      enum TypeBits
+      {
+        //! Query Systems.
+        CIQ_QUERY = 0x01,
+        //! Reply.
+        CIQ_REPLY = 0x02
+      };
+
+      //! Communication Interface.
+      enum CommunicationInterfaceBits
+      {
+        //! Acoustic.
+        CIQ_ACOUSTIC = 0x01,
+        //! Satellite.
+        CIQ_SATELLITE = 0x02,
+        //! GSM.
+        CIQ_GSM = 0x04,
+        //! Mobile.
+        CIQ_MOBILE = 0x08,
+        //! Radio.
+        CIQ_RADIO = 0x10
+      };
+
+      //! Type.
+      uint8_t type;
+      //! Communication Interface.
+      uint16_t comm_interface;
+      //! Model.
+      uint16_t model;
+      //! System List.
+      std::string list;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 189;
+      }
+
+      CommSystemsQuery(void);
+
+      CommSystemsQuery*
+      clone(void) const
+      {
+        return new CommSystemsQuery(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return CommSystemsQuery::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "CommSystemsQuery";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 5;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(list);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Telemetry Message.
+    class TelemetryMsg: public Message
+    {
+    public:
+      //! Type.
+      enum TypeEnum
+      {
+        //! Tx.
+        TM_TX = 0x01,
+        //! Rx.
+        TM_RX = 0x02,
+        //! TxStatus.
+        TM_TXSTATUS = 0x03
+      };
+
+      //! Code.
+      enum CodeEnum
+      {
+        //! Code unknown.
+        TM_CODE_UNK = 0x00,
+        //! Code Report.
+        TM_CODE_REPORT = 0x01,
+        //! Code IMC.
+        TM_CODE_IMC = 0x02,
+        //! Code raw.
+        TM_CODE_RAW = 0x03
+      };
+
+      //! Status.
+      enum StatusEnum
+      {
+        //! Does not apply.
+        TM_NONE = 0x00,
+        //! Successfull transmission.
+        TM_DONE = 1,
+        //! Error while trying to transmit message.
+        TM_FAILED = 2,
+        //! Message has been queued for transmission.
+        TM_QUEUED = 3,
+        //! Message is currently being transmitted.
+        TM_TRANSMIT = 4,
+        //! Message's TTL has expired. Transmition cancelled.
+        TM_EXPIRED = 5,
+        //! No more messages to be transmitted or received.
+        TM_EMPTY = 6,
+        //! Invalid address.
+        TM_INV_ADDR = 7,
+        //! Invalid transmission size.
+        TM_INV_SIZE = 8
+      };
+
+      //! Acknowledge.
+      enum AcknowledgeBits
+      {
+        //! Not acknowledge.
+        TM_NAK = 0x00,
+        //! acknowledge.
+        TM_AK = 0x01
+      };
+
+      //! Type.
+      uint8_t type;
+      //! Request Identifier.
+      uint32_t req_id;
+      //! Time to live.
+      uint16_t ttl;
+      //! Code.
+      uint8_t code;
+      //! Destination Identifier.
+      std::string destination;
+      //! Source Identifier.
+      std::string source;
+      //! Acknowledge.
+      uint8_t acknowledge;
+      //! Status.
+      uint8_t status;
+      //! Data.
+      std::vector<char> data;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 190;
+      }
+
+      TelemetryMsg(void);
+
+      TelemetryMsg*
+      clone(void) const
+      {
+        return new TelemetryMsg(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return TelemetryMsg::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "TelemetryMsg";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 10;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(destination) + IMC::getSerializationSize(source) + IMC::getSerializationSize(data);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
     //! LBL Range.
     class LblRange: public Message
     {
@@ -4125,7 +4564,7 @@ namespace DUNE
 
       LblRange(void);
 
-      Message*
+      LblRange*
       clone(void) const
       {
         return new LblRange(*this);
@@ -4204,7 +4643,7 @@ namespace DUNE
 
       LblBeacon(void);
 
-      Message*
+      LblBeacon*
       clone(void) const
       {
         return new LblBeacon(*this);
@@ -4284,7 +4723,7 @@ namespace DUNE
 
       LblConfig(void);
 
-      Message*
+      LblConfig*
       clone(void) const
       {
         return new LblConfig(*this);
@@ -4367,7 +4806,7 @@ namespace DUNE
 
       AcousticMessage(void);
 
-      Message*
+      AcousticMessage*
       clone(void) const
       {
         return new AcousticMessage(*this);
@@ -4435,6 +4874,104 @@ namespace DUNE
       setDestinationEntityNested(uint8_t value__);
     };
 
+    //! Simulated Acoustic Message.
+    class SimAcousticMessage: public Message
+    {
+    public:
+      //! Flags.
+      enum FlagsBits
+      {
+        //! Acknowledgement.
+        SAM_ACK = 0x01,
+        //! Delayed.
+        SAM_DELAYED = 0x02,
+        //! Reply.
+        SAM_REPLY = 0x03
+      };
+
+      //! Latitude.
+      fp64_t lat;
+      //! Longitude.
+      fp64_t lon;
+      //! Depth.
+      fp32_t depth;
+      //! Sentence.
+      std::string sentence;
+      //! Transmission Time.
+      fp64_t txtime;
+      //! Modem Type.
+      std::string modem_type;
+      //! Source system.
+      std::string sys_src;
+      //! Sequence Id.
+      uint16_t seq;
+      //! Destination System.
+      std::string sys_dst;
+      //! Flags.
+      uint8_t flags;
+      //! Data.
+      std::vector<char> data;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 207;
+      }
+
+      SimAcousticMessage(void);
+
+      SimAcousticMessage*
+      clone(void) const
+      {
+        return new SimAcousticMessage(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return SimAcousticMessage::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "SimAcousticMessage";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 31;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(sentence) + IMC::getSerializationSize(modem_type) + IMC::getSerializationSize(sys_src) + IMC::getSerializationSize(sys_dst) + IMC::getSerializationSize(data);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
     //! Acoustic Operation.
     class AcousticOperation: public Message
     {
@@ -4477,7 +5014,9 @@ namespace DUNE
         //! Send Short Message.
         AOP_MSG_SHORT = 16,
         //! Initiate Reverse Range.
-        AOP_REVERSE_RANGE = 17
+        AOP_REVERSE_RANGE = 17,
+        //! Forced Abort.
+        AOP_FORCED_ABORT = 18
       };
 
       //! Operation.
@@ -4497,7 +5036,7 @@ namespace DUNE
 
       AcousticOperation(void);
 
-      Message*
+      AcousticOperation*
       clone(void) const
       {
         return new AcousticOperation(*this);
@@ -4578,7 +5117,7 @@ namespace DUNE
 
       AcousticSystemsQuery(void);
 
-      Message*
+      AcousticSystemsQuery*
       clone(void) const
       {
         return new AcousticSystemsQuery(*this);
@@ -4633,7 +5172,7 @@ namespace DUNE
 
       AcousticSystems(void);
 
-      Message*
+      AcousticSystems*
       clone(void) const
       {
         return new AcousticSystems(*this);
@@ -4704,7 +5243,7 @@ namespace DUNE
 
       AcousticLink(void);
 
-      Message*
+      AcousticLink*
       clone(void) const
       {
         return new AcousticLink(*this);
@@ -4756,6 +5295,227 @@ namespace DUNE
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
+    //! Acoustic Transmission Request.
+    class AcousticRequest: public Message
+    {
+    public:
+      //! Type.
+      enum TypeEnum
+      {
+        //! Abort.
+        TYPE_ABORT = 0,
+        //! Range.
+        TYPE_RANGE = 1,
+        //! Reverse Range.
+        TYPE_REVERSE_RANGE = 2,
+        //! Message.
+        TYPE_MSG = 3,
+        //! Raw.
+        TYPE_RAW = 4
+      };
+
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Destination System.
+      std::string destination;
+      //! Timeout.
+      fp64_t timeout;
+      //! Range.
+      fp32_t range;
+      //! Type.
+      uint8_t type;
+      //! Message To Send.
+      InlineMessage<Message> msg;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 215;
+      }
+
+      AcousticRequest(void);
+
+      AcousticRequest*
+      clone(void) const
+      {
+        return new AcousticRequest(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return AcousticRequest::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "AcousticRequest";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 15;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(destination) + msg.getSerializationSize();
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
+    };
+
+    //! Acoustic Transmission Status.
+    class AcousticStatus: public Message
+    {
+    public:
+      //! Type.
+      enum TypeEnum
+      {
+        //! Abort.
+        TYPE_ABORT = 0,
+        //! Range.
+        TYPE_RANGE = 1,
+        //! Reverse Range.
+        TYPE_REVERSE_RANGE = 2,
+        //! Message.
+        TYPE_MSG = 3,
+        //! Raw.
+        TYPE_RAW = 4
+      };
+
+      //! Status.
+      enum StatusEnum
+      {
+        //! Queued.
+        STATUS_QUEUED = 0,
+        //! In Progress.
+        STATUS_IN_PROGRESS = 1,
+        //! Sent.
+        STATUS_SENT = 2,
+        //! Range Received.
+        STATUS_RANGE_RECEIVED = 3,
+        //! Delivered.
+        STATUS_DELIVERED = 4,
+        //! Busy.
+        STATUS_BUSY = 100,
+        //! Input Error.
+        STATUS_INPUT_FAILURE = 101,
+        //! Error trying to send acoustic text.
+        STATUS_ERROR = 102,
+        //! Message Type is not defined or is unsupported.
+        STATUS_UNSUPPORTED = 666
+      };
+
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Type.
+      uint8_t type;
+      //! Status.
+      uint8_t status;
+      //! Information.
+      std::string info;
+      //! Range.
+      fp32_t range;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 216;
+      }
+
+      AcousticStatus(void);
+
+      AcousticStatus*
+      clone(void) const
+      {
+        return new AcousticStatus(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return AcousticStatus::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "AcousticStatus";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 8;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(info);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
     //! Revolutions Per Minute.
     class Rpm: public Message
     {
@@ -4771,7 +5531,7 @@ namespace DUNE
 
       Rpm(void);
 
-      Message*
+      Rpm*
       clone(void) const
       {
         return new Rpm(*this);
@@ -4838,7 +5598,7 @@ namespace DUNE
 
       Voltage(void);
 
-      Message*
+      Voltage*
       clone(void) const
       {
         return new Voltage(*this);
@@ -4905,7 +5665,7 @@ namespace DUNE
 
       Current(void);
 
-      Message*
+      Current*
       clone(void) const
       {
         return new Current(*this);
@@ -5040,7 +5800,7 @@ namespace DUNE
 
       GpsFix(void);
 
-      Message*
+      GpsFix*
       clone(void) const
       {
         return new GpsFix(*this);
@@ -5109,7 +5869,7 @@ namespace DUNE
 
       EulerAngles(void);
 
-      Message*
+      EulerAngles*
       clone(void) const
       {
         return new EulerAngles(*this);
@@ -5178,7 +5938,7 @@ namespace DUNE
 
       EulerAnglesDelta(void);
 
-      Message*
+      EulerAnglesDelta*
       clone(void) const
       {
         return new EulerAnglesDelta(*this);
@@ -5245,7 +6005,7 @@ namespace DUNE
 
       AngularVelocity(void);
 
-      Message*
+      AngularVelocity*
       clone(void) const
       {
         return new AngularVelocity(*this);
@@ -5312,7 +6072,7 @@ namespace DUNE
 
       Acceleration(void);
 
-      Message*
+      Acceleration*
       clone(void) const
       {
         return new Acceleration(*this);
@@ -5379,7 +6139,7 @@ namespace DUNE
 
       MagneticField(void);
 
-      Message*
+      MagneticField*
       clone(void) const
       {
         return new MagneticField(*this);
@@ -5457,7 +6217,7 @@ namespace DUNE
 
       GroundVelocity(void);
 
-      Message*
+      GroundVelocity*
       clone(void) const
       {
         return new GroundVelocity(*this);
@@ -5535,7 +6295,7 @@ namespace DUNE
 
       WaterVelocity(void);
 
-      Message*
+      WaterVelocity*
       clone(void) const
       {
         return new WaterVelocity(*this);
@@ -5602,7 +6362,7 @@ namespace DUNE
 
       VelocityDelta(void);
 
-      Message*
+      VelocityDelta*
       clone(void) const
       {
         return new VelocityDelta(*this);
@@ -5673,7 +6433,7 @@ namespace DUNE
 
       DeviceState(void);
 
-      Message*
+      DeviceState*
       clone(void) const
       {
         return new DeviceState(*this);
@@ -5736,7 +6496,7 @@ namespace DUNE
 
       BeamConfig(void);
 
-      Message*
+      BeamConfig*
       clone(void) const
       {
         return new BeamConfig(*this);
@@ -5812,7 +6572,7 @@ namespace DUNE
 
       Distance(void);
 
-      Message*
+      Distance*
       clone(void) const
       {
         return new Distance(*this);
@@ -5901,7 +6661,7 @@ namespace DUNE
 
       Temperature(void);
 
-      Message*
+      Temperature*
       clone(void) const
       {
         return new Temperature(*this);
@@ -5968,7 +6728,7 @@ namespace DUNE
 
       Pressure(void);
 
-      Message*
+      Pressure*
       clone(void) const
       {
         return new Pressure(*this);
@@ -6035,7 +6795,7 @@ namespace DUNE
 
       Depth(void);
 
-      Message*
+      Depth*
       clone(void) const
       {
         return new Depth(*this);
@@ -6102,7 +6862,7 @@ namespace DUNE
 
       DepthOffset(void);
 
-      Message*
+      DepthOffset*
       clone(void) const
       {
         return new DepthOffset(*this);
@@ -6169,7 +6929,7 @@ namespace DUNE
 
       SoundSpeed(void);
 
-      Message*
+      SoundSpeed*
       clone(void) const
       {
         return new SoundSpeed(*this);
@@ -6236,7 +6996,7 @@ namespace DUNE
 
       WaterDensity(void);
 
-      Message*
+      WaterDensity*
       clone(void) const
       {
         return new WaterDensity(*this);
@@ -6303,7 +7063,7 @@ namespace DUNE
 
       Conductivity(void);
 
-      Message*
+      Conductivity*
       clone(void) const
       {
         return new Conductivity(*this);
@@ -6370,7 +7130,7 @@ namespace DUNE
 
       Salinity(void);
 
-      Message*
+      Salinity*
       clone(void) const
       {
         return new Salinity(*this);
@@ -6441,7 +7201,7 @@ namespace DUNE
 
       WindSpeed(void);
 
-      Message*
+      WindSpeed*
       clone(void) const
       {
         return new WindSpeed(*this);
@@ -6502,7 +7262,7 @@ namespace DUNE
 
       RelativeHumidity(void);
 
-      Message*
+      RelativeHumidity*
       clone(void) const
       {
         return new RelativeHumidity(*this);
@@ -6569,7 +7329,7 @@ namespace DUNE
 
       DevDataText(void);
 
-      Message*
+      DevDataText*
       clone(void) const
       {
         return new DevDataText(*this);
@@ -6636,7 +7396,7 @@ namespace DUNE
 
       DevDataBinary(void);
 
-      Message*
+      DevDataBinary*
       clone(void) const
       {
         return new DevDataBinary(*this);
@@ -6688,6 +7448,73 @@ namespace DUNE
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
+    //! Force.
+    class Force: public Message
+    {
+    public:
+      //! Measured Force.
+      fp32_t value;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 275;
+      }
+
+      Force(void);
+
+      Force*
+      clone(void) const
+      {
+        return new Force(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return Force::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "Force";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 4;
+      }
+
+      fp64_t
+      getValueFP(void) const;
+
+      void
+      setValueFP(fp64_t val);
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
     //! Sonar Data.
     class SonarData: public Message
     {
@@ -6728,7 +7555,7 @@ namespace DUNE
 
       SonarData(void);
 
-      Message*
+      SonarData*
       clone(void) const
       {
         return new SonarData(*this);
@@ -6809,7 +7636,7 @@ namespace DUNE
 
       Pulse(void);
 
-      Message*
+      Pulse*
       clone(void) const
       {
         return new Pulse(*this);
@@ -6873,7 +7700,7 @@ namespace DUNE
 
       PulseDetectionControl(void);
 
-      Message*
+      PulseDetectionControl*
       clone(void) const
       {
         return new PulseDetectionControl(*this);
@@ -6938,7 +7765,7 @@ namespace DUNE
 
       FuelLevel(void);
 
-      Message*
+      FuelLevel*
       clone(void) const
       {
         return new FuelLevel(*this);
@@ -7039,7 +7866,7 @@ namespace DUNE
 
       GpsNavData(void);
 
-      Message*
+      GpsNavData*
       clone(void) const
       {
         return new GpsNavData(*this);
@@ -7102,7 +7929,7 @@ namespace DUNE
 
       ServoPosition(void);
 
-      Message*
+      ServoPosition*
       clone(void) const
       {
         return new ServoPosition(*this);
@@ -7184,7 +8011,7 @@ namespace DUNE
 
       DataSanity(void);
 
-      Message*
+      DataSanity*
       clone(void) const
       {
         return new DataSanity(*this);
@@ -7245,7 +8072,7 @@ namespace DUNE
 
       RhodamineDye(void);
 
-      Message*
+      RhodamineDye*
       clone(void) const
       {
         return new RhodamineDye(*this);
@@ -7312,7 +8139,7 @@ namespace DUNE
 
       CrudeOil(void);
 
-      Message*
+      CrudeOil*
       clone(void) const
       {
         return new CrudeOil(*this);
@@ -7379,7 +8206,7 @@ namespace DUNE
 
       FineOil(void);
 
-      Message*
+      FineOil*
       clone(void) const
       {
         return new FineOil(*this);
@@ -7446,7 +8273,7 @@ namespace DUNE
 
       Turbidity(void);
 
-      Message*
+      Turbidity*
       clone(void) const
       {
         return new Turbidity(*this);
@@ -7513,7 +8340,7 @@ namespace DUNE
 
       Chlorophyll(void);
 
-      Message*
+      Chlorophyll*
       clone(void) const
       {
         return new Chlorophyll(*this);
@@ -7580,7 +8407,7 @@ namespace DUNE
 
       Fluorescein(void);
 
-      Message*
+      Fluorescein*
       clone(void) const
       {
         return new Fluorescein(*this);
@@ -7647,7 +8474,7 @@ namespace DUNE
 
       Phycocyanin(void);
 
-      Message*
+      Phycocyanin*
       clone(void) const
       {
         return new Phycocyanin(*this);
@@ -7714,7 +8541,7 @@ namespace DUNE
 
       Phycoerythrin(void);
 
-      Message*
+      Phycoerythrin*
       clone(void) const
       {
         return new Phycoerythrin(*this);
@@ -7835,7 +8662,7 @@ namespace DUNE
 
       GpsFixRtk(void);
 
-      Message*
+      GpsFixRtk*
       clone(void) const
       {
         return new GpsFixRtk(*this);
@@ -7934,7 +8761,7 @@ namespace DUNE
 
       EstimatedState(void);
 
-      Message*
+      EstimatedState*
       clone(void) const
       {
         return new EstimatedState(*this);
@@ -8008,7 +8835,7 @@ namespace DUNE
 
       ExternalNavData(void);
 
-      Message*
+      ExternalNavData*
       clone(void) const
       {
         return new ExternalNavData(*this);
@@ -8091,7 +8918,7 @@ namespace DUNE
 
       DissolvedOxygen(void);
 
-      Message*
+      DissolvedOxygen*
       clone(void) const
       {
         return new DissolvedOxygen(*this);
@@ -8158,7 +8985,7 @@ namespace DUNE
 
       AirSaturation(void);
 
-      Message*
+      AirSaturation*
       clone(void) const
       {
         return new AirSaturation(*this);
@@ -8225,7 +9052,7 @@ namespace DUNE
 
       Throttle(void);
 
-      Message*
+      Throttle*
       clone(void) const
       {
         return new Throttle(*this);
@@ -8292,7 +9119,7 @@ namespace DUNE
 
       PH(void);
 
-      Message*
+      PH*
       clone(void) const
       {
         return new PH(*this);
@@ -8359,7 +9186,7 @@ namespace DUNE
 
       Redox(void);
 
-      Message*
+      Redox*
       clone(void) const
       {
         return new Redox(*this);
@@ -8443,7 +9270,7 @@ namespace DUNE
 
       CameraZoom(void);
 
-      Message*
+      CameraZoom*
       clone(void) const
       {
         return new CameraZoom(*this);
@@ -8512,7 +9339,7 @@ namespace DUNE
 
       SetThrusterActuation(void);
 
-      Message*
+      SetThrusterActuation*
       clone(void) const
       {
         return new SetThrusterActuation(*this);
@@ -8587,7 +9414,7 @@ namespace DUNE
 
       SetServoPosition(void);
 
-      Message*
+      SetServoPosition*
       clone(void) const
       {
         return new SetServoPosition(*this);
@@ -8662,7 +9489,7 @@ namespace DUNE
 
       SetControlSurfaceDeflection(void);
 
-      Message*
+      SetControlSurfaceDeflection*
       clone(void) const
       {
         return new SetControlSurfaceDeflection(*this);
@@ -8740,7 +9567,7 @@ namespace DUNE
 
       RemoteActionsRequest(void);
 
-      Message*
+      RemoteActionsRequest*
       clone(void) const
       {
         return new RemoteActionsRequest(*this);
@@ -8807,7 +9634,7 @@ namespace DUNE
 
       RemoteActions(void);
 
-      Message*
+      RemoteActions*
       clone(void) const
       {
         return new RemoteActions(*this);
@@ -8876,7 +9703,7 @@ namespace DUNE
 
       ButtonEvent(void);
 
-      Message*
+      ButtonEvent*
       clone(void) const
       {
         return new ButtonEvent(*this);
@@ -8960,7 +9787,7 @@ namespace DUNE
 
       LcdControl(void);
 
-      Message*
+      LcdControl*
       clone(void) const
       {
         return new LcdControl(*this);
@@ -9050,7 +9877,7 @@ namespace DUNE
 
       PowerOperation(void);
 
-      Message*
+      PowerOperation*
       clone(void) const
       {
         return new PowerOperation(*this);
@@ -9116,7 +9943,9 @@ namespace DUNE
         //! Reset Schedules.
         PCC_OP_SCHED_RESET = 5,
         //! Save Current State.
-        PCC_OP_SAVE = 6
+        PCC_OP_SAVE = 6,
+        //! Restart.
+        PCC_OP_RESTART = 7
       };
 
       //! Channel Name.
@@ -9134,7 +9963,7 @@ namespace DUNE
 
       PowerChannelControl(void);
 
-      Message*
+      PowerChannelControl*
       clone(void) const
       {
         return new PowerChannelControl(*this);
@@ -9199,7 +10028,7 @@ namespace DUNE
 
       QueryPowerChannelState(void);
 
-      Message*
+      QueryPowerChannelState*
       clone(void) const
       {
         return new QueryPowerChannelState(*this);
@@ -9265,7 +10094,7 @@ namespace DUNE
 
       PowerChannelState(void);
 
-      Message*
+      PowerChannelState*
       clone(void) const
       {
         return new PowerChannelState(*this);
@@ -9334,7 +10163,7 @@ namespace DUNE
 
       LedBrightness(void);
 
-      Message*
+      LedBrightness*
       clone(void) const
       {
         return new LedBrightness(*this);
@@ -9407,7 +10236,7 @@ namespace DUNE
 
       QueryLedBrightness(void);
 
-      Message*
+      QueryLedBrightness*
       clone(void) const
       {
         return new QueryLedBrightness(*this);
@@ -9476,7 +10305,7 @@ namespace DUNE
 
       SetLedBrightness(void);
 
-      Message*
+      SetLedBrightness*
       clone(void) const
       {
         return new SetLedBrightness(*this);
@@ -9553,7 +10382,7 @@ namespace DUNE
 
       SetPWM(void);
 
-      Message*
+      SetPWM*
       clone(void) const
       {
         return new SetPWM(*this);
@@ -9624,7 +10453,7 @@ namespace DUNE
 
       PWM(void);
 
-      Message*
+      PWM*
       clone(void) const
       {
         return new PWM(*this);
@@ -9695,7 +10524,7 @@ namespace DUNE
 
       EstimatedStreamVelocity(void);
 
-      Message*
+      EstimatedStreamVelocity*
       clone(void) const
       {
         return new EstimatedStreamVelocity(*this);
@@ -9756,7 +10585,7 @@ namespace DUNE
 
       IndicatedSpeed(void);
 
-      Message*
+      IndicatedSpeed*
       clone(void) const
       {
         return new IndicatedSpeed(*this);
@@ -9823,7 +10652,7 @@ namespace DUNE
 
       TrueSpeed(void);
 
-      Message*
+      TrueSpeed*
       clone(void) const
       {
         return new TrueSpeed(*this);
@@ -9916,7 +10745,7 @@ namespace DUNE
 
       NavigationUncertainty(void);
 
-      Message*
+      NavigationUncertainty*
       clone(void) const
       {
         return new NavigationUncertainty(*this);
@@ -9993,7 +10822,7 @@ namespace DUNE
 
       NavigationData(void);
 
-      Message*
+      NavigationData*
       clone(void) const
       {
         return new NavigationData(*this);
@@ -10071,7 +10900,7 @@ namespace DUNE
 
       GpsFixRejection(void);
 
-      Message*
+      GpsFixRejection*
       clone(void) const
       {
         return new GpsFixRejection(*this);
@@ -10151,7 +10980,7 @@ namespace DUNE
 
       LblRangeAcceptance(void);
 
-      Message*
+      LblRangeAcceptance*
       clone(void) const
       {
         return new LblRangeAcceptance(*this);
@@ -10246,7 +11075,7 @@ namespace DUNE
 
       DvlRejection(void);
 
-      Message*
+      DvlRejection*
       clone(void) const
       {
         return new DvlRejection(*this);
@@ -10323,7 +11152,7 @@ namespace DUNE
 
       LblEstimate(void);
 
-      Message*
+      LblEstimate*
       clone(void) const
       {
         return new LblEstimate(*this);
@@ -10403,7 +11232,17 @@ namespace DUNE
         //! Aligned.
         AS_ALIGNED = 1,
         //! Not Supported.
-        AS_NOT_SUPPORTED = 2
+        AS_NOT_SUPPORTED = 2,
+        //! Aligning.
+        AS_ALIGNING = 3,
+        //! Wrong Medium.
+        AS_WRONG_MEDIUM = 4,
+        //! Coarse Alignment.
+        AS_COARSE_ALIGNMENT = 5,
+        //! Fine Alignment.
+        AS_FINE_ALIGNMENT = 6,
+        //! System Ready.
+        AS_SYSTEM_READY = 7
       };
 
       //! State.
@@ -10417,7 +11256,7 @@ namespace DUNE
 
       AlignmentState(void);
 
-      Message*
+      AlignmentState*
       clone(void) const
       {
         return new AlignmentState(*this);
@@ -10482,7 +11321,7 @@ namespace DUNE
 
       GroupStreamVelocity(void);
 
-      Message*
+      GroupStreamVelocity*
       clone(void) const
       {
         return new GroupStreamVelocity(*this);
@@ -10547,7 +11386,7 @@ namespace DUNE
 
       Airflow(void);
 
-      Message*
+      Airflow*
       clone(void) const
       {
         return new Airflow(*this);
@@ -10608,7 +11447,7 @@ namespace DUNE
 
       DesiredHeading(void);
 
-      Message*
+      DesiredHeading*
       clone(void) const
       {
         return new DesiredHeading(*this);
@@ -10677,7 +11516,7 @@ namespace DUNE
 
       DesiredZ(void);
 
-      Message*
+      DesiredZ*
       clone(void) const
       {
         return new DesiredZ(*this);
@@ -10746,7 +11585,7 @@ namespace DUNE
 
       DesiredSpeed(void);
 
-      Message*
+      DesiredSpeed*
       clone(void) const
       {
         return new DesiredSpeed(*this);
@@ -10813,7 +11652,7 @@ namespace DUNE
 
       DesiredRoll(void);
 
-      Message*
+      DesiredRoll*
       clone(void) const
       {
         return new DesiredRoll(*this);
@@ -10880,7 +11719,7 @@ namespace DUNE
 
       DesiredPitch(void);
 
-      Message*
+      DesiredPitch*
       clone(void) const
       {
         return new DesiredPitch(*this);
@@ -10947,7 +11786,7 @@ namespace DUNE
 
       DesiredVerticalRate(void);
 
-      Message*
+      DesiredVerticalRate*
       clone(void) const
       {
         return new DesiredVerticalRate(*this);
@@ -11059,7 +11898,7 @@ namespace DUNE
 
       DesiredPath(void);
 
-      Message*
+      DesiredPath*
       clone(void) const
       {
         return new DesiredPath(*this);
@@ -11149,7 +11988,7 @@ namespace DUNE
 
       DesiredControl(void);
 
-      Message*
+      DesiredControl*
       clone(void) const
       {
         return new DesiredControl(*this);
@@ -11210,7 +12049,7 @@ namespace DUNE
 
       DesiredHeadingRate(void);
 
-      Message*
+      DesiredHeadingRate*
       clone(void) const
       {
         return new DesiredHeadingRate(*this);
@@ -11306,7 +12145,7 @@ namespace DUNE
 
       DesiredVelocity(void);
 
-      Message*
+      DesiredVelocity*
       clone(void) const
       {
         return new DesiredVelocity(*this);
@@ -11418,7 +12257,7 @@ namespace DUNE
 
       PathControlState(void);
 
-      Message*
+      PathControlState*
       clone(void) const
       {
         return new PathControlState(*this);
@@ -11483,7 +12322,7 @@ namespace DUNE
 
       AllocatedControlTorques(void);
 
-      Message*
+      AllocatedControlTorques*
       clone(void) const
       {
         return new AllocatedControlTorques(*this);
@@ -11550,7 +12389,7 @@ namespace DUNE
 
       ControlParcel(void);
 
-      Message*
+      ControlParcel*
       clone(void) const
       {
         return new ControlParcel(*this);
@@ -11606,7 +12445,9 @@ namespace DUNE
         //! Stop Braking.
         OP_STOP = 0,
         //! Start Braking.
-        OP_START = 1
+        OP_START = 1,
+        //! Revert Actuation.
+        OP_REVERT = 2
       };
 
       //! Operation.
@@ -11620,7 +12461,7 @@ namespace DUNE
 
       Brake(void);
 
-      Message*
+      Brake*
       clone(void) const
       {
         return new Brake(*this);
@@ -11722,7 +12563,7 @@ namespace DUNE
 
       DesiredLinearState(void);
 
-      Message*
+      DesiredLinearState*
       clone(void) const
       {
         return new DesiredLinearState(*this);
@@ -11783,7 +12624,7 @@ namespace DUNE
 
       DesiredThrottle(void);
 
-      Message*
+      DesiredThrottle*
       clone(void) const
       {
         return new DesiredThrottle(*this);
@@ -11870,7 +12711,7 @@ namespace DUNE
 
       Goto(void);
 
-      Message*
+      Goto*
       clone(void) const
       {
         return new Goto(*this);
@@ -11968,7 +12809,7 @@ namespace DUNE
 
       PopUp(void);
 
-      Message*
+      PopUp*
       clone(void) const
       {
         return new PopUp(*this);
@@ -12035,7 +12876,7 @@ namespace DUNE
 
       Teleoperation(void);
 
-      Message*
+      Teleoperation*
       clone(void) const
       {
         return new Teleoperation(*this);
@@ -12156,7 +12997,7 @@ namespace DUNE
 
       Loiter(void);
 
-      Message*
+      Loiter*
       clone(void) const
       {
         return new Loiter(*this);
@@ -12225,7 +13066,7 @@ namespace DUNE
 
       IdleManeuver(void);
 
-      Message*
+      IdleManeuver*
       clone(void) const
       {
         return new IdleManeuver(*this);
@@ -12296,7 +13137,7 @@ namespace DUNE
 
       LowLevelControl(void);
 
-      Message*
+      LowLevelControl*
       clone(void) const
       {
         return new LowLevelControl(*this);
@@ -12418,7 +13259,7 @@ namespace DUNE
 
       Rows(void);
 
-      Message*
+      Rows*
       clone(void) const
       {
         return new Rows(*this);
@@ -12489,7 +13330,7 @@ namespace DUNE
 
       PathPoint(void);
 
-      Message*
+      PathPoint*
       clone(void) const
       {
         return new PathPoint(*this);
@@ -12566,7 +13407,7 @@ namespace DUNE
 
       FollowPath(void);
 
-      Message*
+      FollowPath*
       clone(void) const
       {
         return new FollowPath(*this);
@@ -12667,7 +13508,7 @@ namespace DUNE
 
       YoYo(void);
 
-      Message*
+      YoYo*
       clone(void) const
       {
         return new YoYo(*this);
@@ -12732,7 +13573,7 @@ namespace DUNE
 
       TeleoperationDone(void);
 
-      Message*
+      TeleoperationDone*
       clone(void) const
       {
         return new TeleoperationDone(*this);
@@ -12803,7 +13644,7 @@ namespace DUNE
 
       StationKeeping(void);
 
-      Message*
+      StationKeeping*
       clone(void) const
       {
         return new StationKeeping(*this);
@@ -12899,7 +13740,7 @@ namespace DUNE
 
       Elevator(void);
 
-      Message*
+      Elevator*
       clone(void) const
       {
         return new Elevator(*this);
@@ -12972,7 +13813,7 @@ namespace DUNE
 
       TrajectoryPoint(void);
 
-      Message*
+      TrajectoryPoint*
       clone(void) const
       {
         return new TrajectoryPoint(*this);
@@ -13049,7 +13890,7 @@ namespace DUNE
 
       FollowTrajectory(void);
 
-      Message*
+      FollowTrajectory*
       clone(void) const
       {
         return new FollowTrajectory(*this);
@@ -13136,7 +13977,7 @@ namespace DUNE
 
       CustomManeuver(void);
 
-      Message*
+      CustomManeuver*
       clone(void) const
       {
         return new CustomManeuver(*this);
@@ -13209,7 +14050,7 @@ namespace DUNE
 
       VehicleFormationParticipant(void);
 
-      Message*
+      VehicleFormationParticipant*
       clone(void) const
       {
         return new VehicleFormationParticipant(*this);
@@ -13288,7 +14129,7 @@ namespace DUNE
 
       VehicleFormation(void);
 
-      Message*
+      VehicleFormation*
       clone(void) const
       {
         return new VehicleFormation(*this);
@@ -13369,7 +14210,7 @@ namespace DUNE
 
       StopManeuver(void);
 
-      Message*
+      StopManeuver*
       clone(void) const
       {
         return new StopManeuver(*this);
@@ -13424,7 +14265,7 @@ namespace DUNE
 
       RegisterManeuver(void);
 
-      Message*
+      RegisterManeuver*
       clone(void) const
       {
         return new RegisterManeuver(*this);
@@ -13502,7 +14343,7 @@ namespace DUNE
 
       ManeuverControlState(void);
 
-      Message*
+      ManeuverControlState*
       clone(void) const
       {
         return new ManeuverControlState(*this);
@@ -13583,7 +14424,7 @@ namespace DUNE
 
       FollowSystem(void);
 
-      Message*
+      FollowSystem*
       clone(void) const
       {
         return new FollowSystem(*this);
@@ -13658,7 +14499,7 @@ namespace DUNE
 
       CommsRelay(void);
 
-      Message*
+      CommsRelay*
       clone(void) const
       {
         return new CommsRelay(*this);
@@ -13721,7 +14562,7 @@ namespace DUNE
 
       PolygonVertex(void);
 
-      Message*
+      PolygonVertex*
       clone(void) const
       {
         return new PolygonVertex(*this);
@@ -13796,7 +14637,7 @@ namespace DUNE
 
       CoverArea(void);
 
-      Message*
+      CoverArea*
       clone(void) const
       {
         return new CoverArea(*this);
@@ -13916,7 +14757,7 @@ namespace DUNE
 
       CompassCalibration(void);
 
-      Message*
+      CompassCalibration*
       clone(void) const
       {
         return new CompassCalibration(*this);
@@ -14000,7 +14841,7 @@ namespace DUNE
 
       FormationParameters(void);
 
-      Message*
+      FormationParameters*
       clone(void) const
       {
         return new FormationParameters(*this);
@@ -14109,7 +14950,7 @@ namespace DUNE
 
       FormationPlanExecution(void);
 
-      Message*
+      FormationPlanExecution*
       clone(void) const
       {
         return new FormationPlanExecution(*this);
@@ -14184,7 +15025,7 @@ namespace DUNE
 
       FollowReference(void);
 
-      Message*
+      FollowReference*
       clone(void) const
       {
         return new FollowReference(*this);
@@ -14274,7 +15115,7 @@ namespace DUNE
 
       Reference(void);
 
-      Message*
+      Reference*
       clone(void) const
       {
         return new Reference(*this);
@@ -14371,7 +15212,11 @@ namespace DUNE
         //! Near in the horizontal plane.
         PROX_XY_NEAR = 0x02,
         //! Near in the vertical plane.
-        PROX_Z_NEAR = 0x04
+        PROX_Z_NEAR = 0x04,
+        //! Unreachable in the horizontal plane.
+        PROX_XY_UNREACHABLE = 0x08,
+        //! Unreachable in the vertical plane.
+        PROX_Z_UNREACHABLE = 0x10
       };
 
       //! Controlling Source.
@@ -14393,7 +15238,7 @@ namespace DUNE
 
       FollowRefState(void);
 
-      Message*
+      FollowRefState*
       clone(void) const
       {
         return new FollowRefState(*this);
@@ -14518,7 +15363,7 @@ namespace DUNE
 
       RelativeState(void);
 
-      Message*
+      RelativeState*
       clone(void) const
       {
         return new RelativeState(*this);
@@ -14621,7 +15466,7 @@ namespace DUNE
 
       FormationMonitor(void);
 
-      Message*
+      FormationMonitor*
       clone(void) const
       {
         return new FormationMonitor(*this);
@@ -14721,7 +15566,7 @@ namespace DUNE
 
       Dislodge(void);
 
-      Message*
+      Dislodge*
       clone(void) const
       {
         return new Dislodge(*this);
@@ -14863,7 +15708,7 @@ namespace DUNE
 
       Formation(void);
 
-      Message*
+      Formation*
       clone(void) const
       {
         return new Formation(*this);
@@ -14960,7 +15805,7 @@ namespace DUNE
 
       Launch(void);
 
-      Message*
+      Launch*
       clone(void) const
       {
         return new Launch(*this);
@@ -15041,7 +15886,7 @@ namespace DUNE
 
       Drop(void);
 
-      Message*
+      Drop*
       clone(void) const
       {
         return new Drop(*this);
@@ -15133,7 +15978,7 @@ namespace DUNE
 
       ScheduledGoto(void);
 
-      Message*
+      ScheduledGoto*
       clone(void) const
       {
         return new ScheduledGoto(*this);
@@ -15233,7 +16078,7 @@ namespace DUNE
 
       RowsCoverage(void);
 
-      Message*
+      RowsCoverage*
       clone(void) const
       {
         return new RowsCoverage(*this);
@@ -15320,7 +16165,7 @@ namespace DUNE
 
       Sample(void);
 
-      Message*
+      Sample*
       clone(void) const
       {
         return new Sample(*this);
@@ -15385,7 +16230,7 @@ namespace DUNE
 
       ImageTracking(void);
 
-      Message*
+      ImageTracking*
       clone(void) const
       {
         return new ImageTracking(*this);
@@ -15454,7 +16299,7 @@ namespace DUNE
 
       Takeoff(void);
 
-      Message*
+      Takeoff*
       clone(void) const
       {
         return new Takeoff(*this);
@@ -15541,7 +16386,7 @@ namespace DUNE
 
       Land(void);
 
-      Message*
+      Land*
       clone(void) const
       {
         return new Land(*this);
@@ -15641,7 +16486,7 @@ namespace DUNE
 
       AutonomousSection(void);
 
-      Message*
+      AutonomousSection*
       clone(void) const
       {
         return new AutonomousSection(*this);
@@ -15738,7 +16583,7 @@ namespace DUNE
 
       FollowPoint(void);
 
-      Message*
+      FollowPoint*
       clone(void) const
       {
         return new FollowPoint(*this);
@@ -15784,6 +16629,328 @@ namespace DUNE
       getVariableSerializationSize(void) const
       {
         return IMC::getSerializationSize(target) + IMC::getSerializationSize(custom);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Alignment Maneuver.
+    class Alignment: public Maneuver
+    {
+    public:
+      //! Timeout.
+      uint16_t timeout;
+      //! Latitude WGS-84.
+      fp64_t lat;
+      //! Longitude WGS-84.
+      fp64_t lon;
+      //! Speed.
+      fp32_t speed;
+      //! Speed Units.
+      uint8_t speed_units;
+      //! Custom settings for maneuver.
+      std::string custom;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 495;
+      }
+
+      Alignment(void);
+
+      Alignment*
+      clone(void) const
+      {
+        return new Alignment(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return Alignment::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "Alignment";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 23;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(custom);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Station Keeping Extended.
+    class StationKeepingExtended: public Maneuver
+    {
+    public:
+      //! Flags.
+      enum FlagsBits
+      {
+        //! Keep safe behaviour.
+        FLG_KEEP_SAFE = 0x01
+      };
+
+      //! Latitude WGS-84.
+      fp64_t lat;
+      //! Longitude WGS-84.
+      fp64_t lon;
+      //! Z Reference.
+      fp32_t z;
+      //! Z Units.
+      uint8_t z_units;
+      //! Radius.
+      fp32_t radius;
+      //! Duration.
+      uint16_t duration;
+      //! Speed.
+      fp32_t speed;
+      //! Speed Units.
+      uint8_t speed_units;
+      //! PopUp Period.
+      uint16_t popup_period;
+      //! PopUp Duration.
+      uint16_t popup_duration;
+      //! Flags.
+      uint8_t flags;
+      //! Custom settings for maneuver.
+      std::string custom;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 496;
+      }
+
+      StationKeepingExtended(void);
+
+      StationKeepingExtended*
+      clone(void) const
+      {
+        return new StationKeepingExtended(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return StationKeepingExtended::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "StationKeepingExtended";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 37;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(custom);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Maneuver Done.
+    class ManeuverDone: public Message
+    {
+    public:
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 497;
+      }
+
+      ManeuverDone(void);
+
+      ManeuverDone*
+      clone(void) const
+      {
+        return new ManeuverDone(*this);
+      }
+
+      void
+      clear(void);
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return ManeuverDone::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "ManeuverDone";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 0;
+      }
+    };
+
+    //! Magnetometer Maneuver.
+    class Magnetometer: public Maneuver
+    {
+    public:
+      //! Direction.
+      enum DirectionEnum
+      {
+        //! Clockwise First.
+        MD_CLOCKW_FIRST = 0,
+        //! Counter Clockwise First.
+        MD_CCLOCKW_FIRST = 1
+      };
+
+      //! Timeout.
+      uint16_t timeout;
+      //! Latitude WGS-84.
+      fp64_t lat;
+      //! Longitude WGS-84.
+      fp64_t lon;
+      //! Z Reference.
+      fp32_t z;
+      //! Z Units.
+      uint8_t z_units;
+      //! Speed.
+      fp32_t speed;
+      //! Speed Units.
+      uint8_t speed_units;
+      //! Bearing.
+      fp64_t bearing;
+      //! Width.
+      fp32_t width;
+      //! Direction.
+      uint8_t direction;
+      //! Custom settings for maneuver.
+      std::string custom;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 499;
+      }
+
+      Magnetometer(void);
+
+      Magnetometer*
+      clone(void) const
+      {
+        return new Magnetometer(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return Magnetometer::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "Magnetometer";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 41;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(custom);
       }
 
       void
@@ -15847,7 +17014,7 @@ namespace DUNE
 
       VehicleState(void);
 
-      Message*
+      VehicleState*
       clone(void) const
       {
         return new VehicleState(*this);
@@ -15950,7 +17117,7 @@ namespace DUNE
 
       VehicleCommand(void);
 
-      Message*
+      VehicleCommand*
       clone(void) const
       {
         return new VehicleCommand(*this);
@@ -16050,7 +17217,7 @@ namespace DUNE
 
       MonitorEntityState(void);
 
-      Message*
+      MonitorEntityState*
       clone(void) const
       {
         return new MonitorEntityState(*this);
@@ -16131,7 +17298,7 @@ namespace DUNE
 
       EntityMonitoringState(void);
 
-      Message*
+      EntityMonitoringState*
       clone(void) const
       {
         return new EntityMonitoringState(*this);
@@ -16220,7 +17387,7 @@ namespace DUNE
 
       OperationalLimits(void);
 
-      Message*
+      OperationalLimits*
       clone(void) const
       {
         return new OperationalLimits(*this);
@@ -16279,7 +17446,7 @@ namespace DUNE
 
       GetOperationalLimits(void);
 
-      Message*
+      GetOperationalLimits*
       clone(void) const
       {
         return new GetOperationalLimits(*this);
@@ -16334,7 +17501,7 @@ namespace DUNE
 
       Calibration(void);
 
-      Message*
+      Calibration*
       clone(void) const
       {
         return new Calibration(*this);
@@ -16408,7 +17575,7 @@ namespace DUNE
 
       ControlLoops(void);
 
-      Message*
+      ControlLoops*
       clone(void) const
       {
         return new ControlLoops(*this);
@@ -16484,7 +17651,7 @@ namespace DUNE
 
       VehicleMedium(void);
 
-      Message*
+      VehicleMedium*
       clone(void) const
       {
         return new VehicleMedium(*this);
@@ -16560,7 +17727,7 @@ namespace DUNE
 
       Collision(void);
 
-      Message*
+      Collision*
       clone(void) const
       {
         return new Collision(*this);
@@ -16666,7 +17833,7 @@ namespace DUNE
 
       FormState(void);
 
-      Message*
+      FormState*
       clone(void) const
       {
         return new FormState(*this);
@@ -16740,7 +17907,7 @@ namespace DUNE
 
       AutopilotMode(void);
 
-      Message*
+      AutopilotMode*
       clone(void) const
       {
         return new AutopilotMode(*this);
@@ -16868,7 +18035,7 @@ namespace DUNE
 
       FormationState(void);
 
-      Message*
+      FormationState*
       clone(void) const
       {
         return new FormationState(*this);
@@ -16945,7 +18112,9 @@ namespace DUNE
         //! GSM.
         CI_GSM = 0x04,
         //! Mobile.
-        CI_MOBILE = 0x08
+        CI_MOBILE = 0x08,
+        //! Radio.
+        CI_RADIO = 0x10
       };
 
       //! Operation.
@@ -16965,7 +18134,7 @@ namespace DUNE
 
       ReportControl(void);
 
-      Message*
+      ReportControl*
       clone(void) const
       {
         return new ReportControl(*this);
@@ -17017,6 +18186,792 @@ namespace DUNE
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
+    //! State Report.
+    class StateReport: public Message
+    {
+    public:
+      //! Time Stamp.
+      uint32_t stime;
+      //! Latitude.
+      fp32_t latitude;
+      //! Longitude.
+      fp32_t longitude;
+      //! Altitude.
+      uint16_t altitude;
+      //! Depth.
+      uint16_t depth;
+      //! Heading.
+      uint16_t heading;
+      //! Speed.
+      int16_t speed;
+      //! Fuel.
+      int8_t fuel;
+      //! Execution State.
+      int8_t exec_state;
+      //! Plan Checksum.
+      uint16_t plan_checksum;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 514;
+      }
+
+      StateReport(void);
+
+      StateReport*
+      clone(void) const
+      {
+        return new StateReport(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return StateReport::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "StateReport";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 24;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Transmission Request.
+    class TransmissionRequest: public Message
+    {
+    public:
+      //! Communication Mean.
+      enum CommunicationMeanEnum
+      {
+        //! WiFi.
+        CMEAN_WIFI = 0,
+        //! Acoustic.
+        CMEAN_ACOUSTIC = 1,
+        //! Satellite.
+        CMEAN_SATELLITE = 2,
+        //! GSM.
+        CMEAN_GSM = 3,
+        //! Any.
+        CMEAN_ANY = 4,
+        //! All.
+        CMEAN_ALL = 5
+      };
+
+      //! Data Mode.
+      enum DataModeEnum
+      {
+        //! Inline Message.
+        DMODE_INLINEMSG = 0,
+        //! Text.
+        DMODE_TEXT = 1,
+        //! Raw Data.
+        DMODE_RAW = 2,
+        //! Abort.
+        DMODE_ABORT = 3,
+        //! Range.
+        DMODE_RANGE = 4,
+        //! Reverse Range.
+        DMODE_REVERSE_RANGE = 5
+      };
+
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Communication Mean.
+      uint8_t comm_mean;
+      //! Destination System.
+      std::string destination;
+      //! Deadline.
+      fp64_t deadline;
+      //! Range.
+      fp32_t range;
+      //! Data Mode.
+      uint8_t data_mode;
+      //! Message Data.
+      InlineMessage<Message> msg_data;
+      //! Text Data.
+      std::string txt_data;
+      //! Raw Data.
+      std::vector<char> raw_data;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 515;
+      }
+
+      TransmissionRequest(void);
+
+      TransmissionRequest*
+      clone(void) const
+      {
+        return new TransmissionRequest(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return TransmissionRequest::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "TransmissionRequest";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 16;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(destination) + msg_data.getSerializationSize() + IMC::getSerializationSize(txt_data) + IMC::getSerializationSize(raw_data);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
+    };
+
+    //! Transmission Status.
+    class TransmissionStatus: public Message
+    {
+    public:
+      //! Status.
+      enum StatusEnum
+      {
+        //! In progress.
+        TSTAT_IN_PROGRESS = 0,
+        //! Sent.
+        TSTAT_SENT = 1,
+        //! Delivered.
+        TSTAT_DELIVERED = 51,
+        //! Delivery is unknown.
+        TSTAT_MAYBE_DELIVERED = 52,
+        //! Range received.
+        TSTAT_RANGE_RECEIVED = 60,
+        //! Input Error.
+        TSTAT_INPUT_FAILURE = 101,
+        //! Temporary Error.
+        TSTAT_TEMPORARY_FAILURE = 102,
+        //! Permanent Failure.
+        TSTAT_PERMANENT_FAILURE = 103
+      };
+
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Status.
+      uint8_t status;
+      //! Range.
+      fp32_t range;
+      //! Information.
+      std::string info;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 516;
+      }
+
+      TransmissionStatus(void);
+
+      TransmissionStatus*
+      clone(void) const
+      {
+        return new TransmissionStatus(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return TransmissionStatus::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "TransmissionStatus";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 7;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(info);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! SMS Transmission Request.
+    class SmsRequest: public Message
+    {
+    public:
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Destination.
+      std::string destination;
+      //! Timeout.
+      fp64_t timeout;
+      //! SMS Text.
+      std::string sms_text;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 517;
+      }
+
+      SmsRequest(void);
+
+      SmsRequest*
+      clone(void) const
+      {
+        return new SmsRequest(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return SmsRequest::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "SmsRequest";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 10;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(destination) + IMC::getSerializationSize(sms_text);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! SMS Transmission Status.
+    class SmsStatus: public Message
+    {
+    public:
+      //! Status.
+      enum StatusEnum
+      {
+        //! Queued.
+        SMSSTAT_QUEUED = 0,
+        //! Sent.
+        SMSSTAT_SENT = 1,
+        //! Input Error.
+        SMSSTAT_INPUT_FAILURE = 101,
+        //! Error trying to send sms.
+        SMSSTAT_ERROR = 102
+      };
+
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Status.
+      uint8_t status;
+      //! Information.
+      std::string info;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 518;
+      }
+
+      SmsStatus(void);
+
+      SmsStatus*
+      clone(void) const
+      {
+        return new SmsStatus(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return SmsStatus::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "SmsStatus";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 3;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(info);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! VTOL State.
+    class VtolState: public Message
+    {
+    public:
+      //! State.
+      enum StateEnum
+      {
+        //! Undefined.
+        VTOL_STATE_UNDEFINED = 0,
+        //! Transition to Fixed-Wing.
+        VTOL_STATE_TRANSITION_TO_FW = 1,
+        //! Transition to MultiCopter.
+        VTOL_STATE_TRANSITION_TO_MC = 2,
+        //! MutiCopter.
+        VTOL_STATE_MC = 3,
+        //! Fixed-Wing.
+        VTOL_STATE_FW = 4
+      };
+
+      //! State.
+      uint8_t state;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 519;
+      }
+
+      VtolState(void);
+
+      VtolState*
+      clone(void) const
+      {
+        return new VtolState(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return VtolState::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "VtolState";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 1;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Arming State.
+    class ArmingState: public Message
+    {
+    public:
+      //! State.
+      enum StateEnum
+      {
+        //! Armed.
+        MOTORS_ARMED = 0,
+        //! Disarmed.
+        MOTORS_DISARMED = 1
+      };
+
+      //! State.
+      uint8_t state;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 520;
+      }
+
+      ArmingState(void);
+
+      ArmingState*
+      clone(void) const
+      {
+        return new ArmingState(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return ArmingState::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "ArmingState";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 1;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! TCP Transmission Request.
+    class TCPRequest: public Message
+    {
+    public:
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Destination.
+      std::string destination;
+      //! Timeout.
+      fp64_t timeout;
+      //! Message Data.
+      InlineMessage<Message> msg_data;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 521;
+      }
+
+      TCPRequest(void);
+
+      TCPRequest*
+      clone(void) const
+      {
+        return new TCPRequest(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return TCPRequest::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "TCPRequest";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 10;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(destination) + msg_data.getSerializationSize();
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
+    };
+
+    //! TCP Transmission Status.
+    class TCPStatus: public Message
+    {
+    public:
+      //! Status.
+      enum StatusEnum
+      {
+        //! Queued.
+        TCPSTAT_QUEUED = 0,
+        //! Sent.
+        TCPSTAT_SENT = 1,
+        //! Input Error.
+        TCPSTAT_INPUT_FAILURE = 100,
+        //! Host Unknown.
+        TCPSTAT_HOST_UNKNOWN = 101,
+        //! Can't Connect.
+        TCPSTAT_CANT_CONNECT = 102,
+        //! Error trying to send sms.
+        TCPSTAT_ERROR = 103
+      };
+
+      //! Request Identifier.
+      uint16_t req_id;
+      //! Status.
+      uint8_t status;
+      //! Information.
+      std::string info;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 522;
+      }
+
+      TCPStatus(void);
+
+      TCPStatus*
+      clone(void) const
+      {
+        return new TCPStatus(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return TCPStatus::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "TCPStatus";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 3;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(info);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
     //! Abort.
     class Abort: public Message
     {
@@ -17030,7 +18985,7 @@ namespace DUNE
 
       Abort(void);
 
-      Message*
+      Abort*
       clone(void) const
       {
         return new Abort(*this);
@@ -17115,7 +19070,7 @@ namespace DUNE
 
       PlanVariable(void);
 
-      Message*
+      PlanVariable*
       clone(void) const
       {
         return new PlanVariable(*this);
@@ -17188,7 +19143,7 @@ namespace DUNE
 
       PlanManeuver(void);
 
-      Message*
+      PlanManeuver*
       clone(void) const
       {
         return new PlanManeuver(*this);
@@ -17277,7 +19232,7 @@ namespace DUNE
 
       PlanTransition(void);
 
-      Message*
+      PlanTransition*
       clone(void) const
       {
         return new PlanTransition(*this);
@@ -17376,7 +19331,7 @@ namespace DUNE
 
       PlanSpecification(void);
 
-      Message*
+      PlanSpecification*
       clone(void) const
       {
         return new PlanSpecification(*this);
@@ -17478,7 +19433,7 @@ namespace DUNE
 
       EmergencyControl(void);
 
-      Message*
+      EmergencyControl*
       clone(void) const
       {
         return new EmergencyControl(*this);
@@ -17582,7 +19537,7 @@ namespace DUNE
 
       EmergencyControlState(void);
 
-      Message*
+      EmergencyControlState*
       clone(void) const
       {
         return new EmergencyControlState(*this);
@@ -17693,7 +19648,7 @@ namespace DUNE
 
       PlanDB(void);
 
-      Message*
+      PlanDB*
       clone(void) const
       {
         return new PlanDB(*this);
@@ -17786,7 +19741,7 @@ namespace DUNE
 
       PlanDBInformation(void);
 
-      Message*
+      PlanDBInformation*
       clone(void) const
       {
         return new PlanDBInformation(*this);
@@ -17865,7 +19820,7 @@ namespace DUNE
 
       PlanDBState(void);
 
-      Message*
+      PlanDBState*
       clone(void) const
       {
         return new PlanDBState(*this);
@@ -17995,7 +19950,7 @@ namespace DUNE
 
       PlanControl(void);
 
-      Message*
+      PlanControl*
       clone(void) const
       {
         return new PlanControl(*this);
@@ -18116,7 +20071,7 @@ namespace DUNE
 
       PlanControlState(void);
 
-      Message*
+      PlanControlState*
       clone(void) const
       {
         return new PlanControlState(*this);
@@ -18209,7 +20164,7 @@ namespace DUNE
 
       PlanGeneration(void);
 
-      Message*
+      PlanGeneration*
       clone(void) const
       {
         return new PlanGeneration(*this);
@@ -18325,7 +20280,7 @@ namespace DUNE
 
       LeaderState(void);
 
-      Message*
+      LeaderState*
       clone(void) const
       {
         return new LeaderState(*this);
@@ -18430,7 +20385,7 @@ namespace DUNE
 
       PlanStatistics(void);
 
-      Message*
+      PlanStatistics*
       clone(void) const
       {
         return new PlanStatistics(*this);
@@ -18528,7 +20483,7 @@ namespace DUNE
 
       ReportedState(void);
 
-      Message*
+      ReportedState*
       clone(void) const
       {
         return new ReportedState(*this);
@@ -18607,7 +20562,7 @@ namespace DUNE
 
       RemoteSensorInfo(void);
 
-      Message*
+      RemoteSensorInfo*
       clone(void) const
       {
         return new RemoteSensorInfo(*this);
@@ -18678,7 +20633,7 @@ namespace DUNE
 
       MapPoint(void);
 
-      Message*
+      MapPoint*
       clone(void) const
       {
         return new MapPoint(*this);
@@ -18768,7 +20723,7 @@ namespace DUNE
 
       MapFeature(void);
 
-      Message*
+      MapFeature*
       clone(void) const
       {
         return new MapFeature(*this);
@@ -18853,7 +20808,7 @@ namespace DUNE
 
       Map(void);
 
-      Message*
+      Map*
       clone(void) const
       {
         return new Map(*this);
@@ -18963,7 +20918,7 @@ namespace DUNE
 
       CcuEvent(void);
 
-      Message*
+      CcuEvent*
       clone(void) const
       {
         return new CcuEvent(*this);
@@ -19048,7 +21003,7 @@ namespace DUNE
 
       VehicleLinks(void);
 
-      Message*
+      VehicleLinks*
       clone(void) const
       {
         return new VehicleLinks(*this);
@@ -19135,7 +21090,7 @@ namespace DUNE
 
       TrexObservation(void);
 
-      Message*
+      TrexObservation*
       clone(void) const
       {
         return new TrexObservation(*this);
@@ -19223,7 +21178,7 @@ namespace DUNE
 
       TrexCommand(void);
 
-      Message*
+      TrexCommand*
       clone(void) const
       {
         return new TrexCommand(*this);
@@ -19311,7 +21266,7 @@ namespace DUNE
 
       TrexAttribute(void);
 
-      Message*
+      TrexAttribute*
       clone(void) const
       {
         return new TrexAttribute(*this);
@@ -19382,7 +21337,7 @@ namespace DUNE
 
       TrexToken(void);
 
-      Message*
+      TrexToken*
       clone(void) const
       {
         return new TrexToken(*this);
@@ -19484,7 +21439,7 @@ namespace DUNE
 
       TrexOperation(void);
 
-      Message*
+      TrexOperation*
       clone(void) const
       {
         return new TrexOperation(*this);
@@ -19569,7 +21524,7 @@ namespace DUNE
 
       TrexPlan(void);
 
-      Message*
+      TrexPlan*
       clone(void) const
       {
         return new TrexPlan(*this);
@@ -19654,7 +21609,7 @@ namespace DUNE
 
       Event(void);
 
-      Message*
+      Event*
       clone(void) const
       {
         return new Event(*this);
@@ -19723,7 +21678,7 @@ namespace DUNE
 
       CompressedImage(void);
 
-      Message*
+      CompressedImage*
       clone(void) const
       {
         return new CompressedImage(*this);
@@ -19796,7 +21751,7 @@ namespace DUNE
 
       ImageTxSettings(void);
 
-      Message*
+      ImageTxSettings*
       clone(void) const
       {
         return new ImageTxSettings(*this);
@@ -19865,7 +21820,7 @@ namespace DUNE
 
       RemoteState(void);
 
-      Message*
+      RemoteState*
       clone(void) const
       {
         return new RemoteState(*this);
@@ -19938,7 +21893,7 @@ namespace DUNE
 
       Target(void);
 
-      Message*
+      Target*
       clone(void) const
       {
         return new Target(*this);
@@ -20007,7 +21962,7 @@ namespace DUNE
 
       EntityParameter(void);
 
-      Message*
+      EntityParameter*
       clone(void) const
       {
         return new EntityParameter(*this);
@@ -20076,7 +22031,7 @@ namespace DUNE
 
       EntityParameters(void);
 
-      Message*
+      EntityParameters*
       clone(void) const
       {
         return new EntityParameters(*this);
@@ -20163,7 +22118,7 @@ namespace DUNE
 
       QueryEntityParameters(void);
 
-      Message*
+      QueryEntityParameters*
       clone(void) const
       {
         return new QueryEntityParameters(*this);
@@ -20232,7 +22187,7 @@ namespace DUNE
 
       SetEntityParameters(void);
 
-      Message*
+      SetEntityParameters*
       clone(void) const
       {
         return new SetEntityParameters(*this);
@@ -20315,7 +22270,7 @@ namespace DUNE
 
       SaveEntityParameters(void);
 
-      Message*
+      SaveEntityParameters*
       clone(void) const
       {
         return new SaveEntityParameters(*this);
@@ -20382,7 +22337,7 @@ namespace DUNE
 
       CreateSession(void);
 
-      Message*
+      CreateSession*
       clone(void) const
       {
         return new CreateSession(*this);
@@ -20443,7 +22398,7 @@ namespace DUNE
 
       CloseSession(void);
 
-      Message*
+      CloseSession*
       clone(void) const
       {
         return new CloseSession(*this);
@@ -20506,7 +22461,7 @@ namespace DUNE
 
       SessionSubscription(void);
 
-      Message*
+      SessionSubscription*
       clone(void) const
       {
         return new SessionSubscription(*this);
@@ -20573,7 +22528,7 @@ namespace DUNE
 
       SessionKeepAlive(void);
 
-      Message*
+      SessionKeepAlive*
       clone(void) const
       {
         return new SessionKeepAlive(*this);
@@ -20645,7 +22600,7 @@ namespace DUNE
 
       SessionStatus(void);
 
-      Message*
+      SessionStatus*
       clone(void) const
       {
         return new SessionStatus(*this);
@@ -20706,7 +22661,7 @@ namespace DUNE
 
       PushEntityParameters(void);
 
-      Message*
+      PushEntityParameters*
       clone(void) const
       {
         return new PushEntityParameters(*this);
@@ -20773,7 +22728,7 @@ namespace DUNE
 
       PopEntityParameters(void);
 
-      Message*
+      PopEntityParameters*
       clone(void) const
       {
         return new PopEntityParameters(*this);
@@ -20851,7 +22806,7 @@ namespace DUNE
 
       IoEvent(void);
 
-      Message*
+      IoEvent*
       clone(void) const
       {
         return new IoEvent(*this);
@@ -20913,7 +22868,9 @@ namespace DUNE
         //! Acknowledgement.
         UTF_ACK = 0x01,
         //! Delayed.
-        UTF_DELAYED = 0x02
+        UTF_DELAYED = 0x02,
+        //! Forced.
+        UTF_FORCED = 0x04
       };
 
       //! Sequence Id.
@@ -20933,7 +22890,7 @@ namespace DUNE
 
       UamTxFrame(void);
 
-      Message*
+      UamTxFrame*
       clone(void) const
       {
         return new UamTxFrame(*this);
@@ -21015,7 +22972,7 @@ namespace DUNE
 
       UamRxFrame(void);
 
-      Message*
+      UamRxFrame*
       clone(void) const
       {
         return new UamRxFrame(*this);
@@ -21085,7 +23042,15 @@ namespace DUNE
         //! Invalid address.
         UTS_INV_ADDR = 4,
         //! In Progress.
-        UTS_IP = 5
+        UTS_IP = 5,
+        //! Unsupported operation.
+        UTS_UNSUPPORTED = 6,
+        //! Invalid transmission size.
+        UTS_INV_SIZE = 7,
+        //! Message has been sent.
+        UTS_SENT = 8,
+        //! Message has been acknowledged by the destination.
+        UTS_DELIVERED = 9
       };
 
       //! Sequence Id.
@@ -21103,7 +23068,7 @@ namespace DUNE
 
       UamTxStatus(void);
 
-      Message*
+      UamTxStatus*
       clone(void) const
       {
         return new UamTxStatus(*this);
@@ -21180,7 +23145,7 @@ namespace DUNE
 
       UamRxRange(void);
 
-      Message*
+      UamRxRange*
       clone(void) const
       {
         return new UamRxRange(*this);
@@ -21238,6 +23203,77 @@ namespace DUNE
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
+    //! UamTxRange.
+    class UamTxRange: public Message
+    {
+    public:
+      //! Sequence Id.
+      uint16_t seq;
+      //! Destination System.
+      std::string sys_dst;
+      //! Timeout.
+      fp32_t timeout;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 818;
+      }
+
+      UamTxRange(void);
+
+      UamTxRange*
+      clone(void) const
+      {
+        return new UamTxRange(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return UamTxRange::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "UamTxRange";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 6;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(sys_dst);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
     //! Formation Control Parameters.
     class FormCtrlParam: public Message
     {
@@ -21274,7 +23310,7 @@ namespace DUNE
 
       FormCtrlParam(void);
 
-      Message*
+      FormCtrlParam*
       clone(void) const
       {
         return new FormCtrlParam(*this);
@@ -21339,7 +23375,7 @@ namespace DUNE
 
       FormationEval(void);
 
-      Message*
+      FormationEval*
       clone(void) const
       {
         return new FormationEval(*this);
@@ -21431,7 +23467,7 @@ namespace DUNE
 
       FormationControlParams(void);
 
-      Message*
+      FormationControlParams*
       clone(void) const
       {
         return new FormationControlParams(*this);
@@ -21530,7 +23566,7 @@ namespace DUNE
 
       FormationEvaluation(void);
 
-      Message*
+      FormationEvaluation*
       clone(void) const
       {
         return new FormationEvaluation(*this);
@@ -21598,6 +23634,355 @@ namespace DUNE
       setDestinationEntityNested(uint8_t value__);
     };
 
+    //! SOI Waypoint.
+    class SoiWaypoint: public Message
+    {
+    public:
+      //! Latitude.
+      fp32_t lat;
+      //! Longitude.
+      fp32_t lon;
+      //! Time Of Arrival.
+      uint32_t eta;
+      //! Duration.
+      uint16_t duration;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 850;
+      }
+
+      SoiWaypoint(void);
+
+      SoiWaypoint*
+      clone(void) const
+      {
+        return new SoiWaypoint(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return SoiWaypoint::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "SoiWaypoint";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 14;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! SOI Plan.
+    class SoiPlan: public Message
+    {
+    public:
+      //! Plan Identifier.
+      uint16_t plan_id;
+      //! Waypoints.
+      MessageList<SoiWaypoint> waypoints;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 851;
+      }
+
+      SoiPlan(void);
+
+      SoiPlan*
+      clone(void) const
+      {
+        return new SoiPlan(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return SoiPlan::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "SoiPlan";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 2;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return waypoints.getSerializationSize();
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
+    };
+
+    //! SOI Command.
+    class SoiCommand: public Message
+    {
+    public:
+      //! Type.
+      enum TypeEnum
+      {
+        //! Request.
+        SOITYPE_REQUEST = 1,
+        //! Success.
+        SOITYPE_SUCCESS = 2,
+        //! Error.
+        SOITYPE_ERROR = 3
+      };
+
+      //! Command.
+      enum CommandEnum
+      {
+        //! Execute Plan.
+        SOICMD_EXEC = 1,
+        //! Stop Execution.
+        SOICMD_STOP = 2,
+        //! Set Parameters.
+        SOICMD_SET_PARAMS = 3,
+        //! Get Parameters.
+        SOICMD_GET_PARAMS = 4,
+        //! Get Plan.
+        SOICMD_GET_PLAN = 5,
+        //! Resume Execution.
+        SOICMD_RESUME = 6
+      };
+
+      //! Type.
+      uint8_t type;
+      //! Command.
+      uint8_t command;
+      //! Settings.
+      std::string settings;
+      //! Plan.
+      InlineMessage<SoiPlan> plan;
+      //! Extra Information.
+      std::string info;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 852;
+      }
+
+      SoiCommand(void);
+
+      SoiCommand*
+      clone(void) const
+      {
+        return new SoiCommand(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return SoiCommand::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "SoiCommand";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 2;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(settings) + plan.getSerializationSize() + IMC::getSerializationSize(info);
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
+    };
+
+    //! SOI State.
+    class SoiState: public Message
+    {
+    public:
+      //! State.
+      enum StateEnum
+      {
+        //! Executing.
+        SOISTATE_EXEC = 1,
+        //! Idle.
+        SOISTATE_IDLE = 2,
+        //! Inactive.
+        SOISTATE_INACTIVE = 3
+      };
+
+      //! State.
+      uint8_t state;
+      //! Plan Identifier.
+      uint16_t plan_id;
+      //! Waypoint Identifier.
+      uint8_t wpt_id;
+      //! Settings Checksum.
+      uint16_t settings_chk;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 853;
+      }
+
+      SoiState(void);
+
+      SoiState*
+      clone(void) const
+      {
+        return new SoiState(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return SoiState::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "SoiState";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 6;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
     //! Message Fragment.
     class MessagePart: public Message
     {
@@ -21619,7 +24004,7 @@ namespace DUNE
 
       MessagePart(void);
 
-      Message*
+      MessagePart*
       clone(void) const
       {
         return new MessagePart(*this);
@@ -21688,7 +24073,7 @@ namespace DUNE
 
       NeptusBlob(void);
 
-      Message*
+      NeptusBlob*
       clone(void) const
       {
         return new NeptusBlob(*this);
@@ -21753,7 +24138,7 @@ namespace DUNE
 
       Aborted(void);
 
-      Message*
+      Aborted*
       clone(void) const
       {
         return new Aborted(*this);
@@ -21812,7 +24197,7 @@ namespace DUNE
 
       UsblAngles(void);
 
-      Message*
+      UsblAngles*
       clone(void) const
       {
         return new UsblAngles(*this);
@@ -21879,7 +24264,7 @@ namespace DUNE
 
       UsblPosition(void);
 
-      Message*
+      UsblPosition*
       clone(void) const
       {
         return new UsblPosition(*this);
@@ -21948,7 +24333,7 @@ namespace DUNE
 
       UsblFix(void);
 
-      Message*
+      UsblFix*
       clone(void) const
       {
         return new UsblFix(*this);
@@ -22011,7 +24396,7 @@ namespace DUNE
 
       ParametersXml(void);
 
-      Message*
+      ParametersXml*
       clone(void) const
       {
         return new ParametersXml(*this);
@@ -22076,7 +24461,7 @@ namespace DUNE
 
       GetParametersXml(void);
 
-      Message*
+      GetParametersXml*
       clone(void) const
       {
         return new GetParametersXml(*this);
@@ -22135,7 +24520,7 @@ namespace DUNE
 
       SetImageCoords(void);
 
-      Message*
+      SetImageCoords*
       clone(void) const
       {
         return new SetImageCoords(*this);
@@ -22200,7 +24585,7 @@ namespace DUNE
 
       GetImageCoords(void);
 
-      Message*
+      GetImageCoords*
       clone(void) const
       {
         return new GetImageCoords(*this);
@@ -22271,7 +24656,7 @@ namespace DUNE
 
       GetWorldCoordinates(void);
 
-      Message*
+      GetWorldCoordinates*
       clone(void) const
       {
         return new GetWorldCoordinates(*this);
@@ -22348,7 +24733,7 @@ namespace DUNE
 
       UsblAnglesExtended(void);
 
-      Message*
+      UsblAnglesExtended*
       clone(void) const
       {
         return new UsblAnglesExtended(*this);
@@ -22435,7 +24820,7 @@ namespace DUNE
 
       UsblPositionExtended(void);
 
-      Message*
+      UsblPositionExtended*
       clone(void) const
       {
         return new UsblPositionExtended(*this);
@@ -22512,7 +24897,7 @@ namespace DUNE
 
       UsblFixExtended(void);
 
-      Message*
+      UsblFixExtended*
       clone(void) const
       {
         return new UsblFixExtended(*this);
@@ -22587,7 +24972,7 @@ namespace DUNE
 
       UsblModem(void);
 
-      Message*
+      UsblModem*
       clone(void) const
       {
         return new UsblModem(*this);
@@ -22667,7 +25052,7 @@ namespace DUNE
 
       UsblConfig(void);
 
-      Message*
+      UsblConfig*
       clone(void) const
       {
         return new UsblConfig(*this);
@@ -22761,7 +25146,7 @@ namespace DUNE
 
       DissolvedOrganicMatter(void);
 
-      Message*
+      DissolvedOrganicMatter*
       clone(void) const
       {
         return new DissolvedOrganicMatter(*this);
@@ -22828,7 +25213,7 @@ namespace DUNE
 
       OpticalBackscatter(void);
 
-      Message*
+      OpticalBackscatter*
       clone(void) const
       {
         return new OpticalBackscatter(*this);
@@ -22925,7 +25310,7 @@ namespace DUNE
 
       Tachograph(void);
 
-      Message*
+      Tachograph*
       clone(void) const
       {
         return new Tachograph(*this);
@@ -23009,7 +25394,7 @@ namespace DUNE
 
       ApmStatus(void);
 
-      Message*
+      ApmStatus*
       clone(void) const
       {
         return new ApmStatus(*this);
@@ -23091,7 +25476,7 @@ namespace DUNE
 
       SadcReadings(void);
 
-      Message*
+      SadcReadings*
       clone(void) const
       {
         return new SadcReadings(*this);
@@ -23131,6 +25516,244 @@ namespace DUNE
       getFixedSerializationSize(void) const
       {
         return 6;
+      }
+
+      fp64_t
+      getValueFP(void) const;
+
+      void
+      setValueFP(fp64_t val);
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! DMS Detection.
+    class DmsDetection: public Message
+    {
+    public:
+      //! Channel 1.
+      fp32_t ch01;
+      //! Channel 2.
+      fp32_t ch02;
+      //! Channel 3.
+      fp32_t ch03;
+      //! Channel 4.
+      fp32_t ch04;
+      //! Channel 5.
+      fp32_t ch05;
+      //! Channel 6.
+      fp32_t ch06;
+      //! Channel 7.
+      fp32_t ch07;
+      //! Channel 8.
+      fp32_t ch08;
+      //! Channel 9.
+      fp32_t ch09;
+      //! Channel 10.
+      fp32_t ch10;
+      //! Channel 11.
+      fp32_t ch11;
+      //! Channel 12.
+      fp32_t ch12;
+      //! Channel 13.
+      fp32_t ch13;
+      //! Channel 14.
+      fp32_t ch14;
+      //! Channel 15.
+      fp32_t ch15;
+      //! Channel 16.
+      fp32_t ch16;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 908;
+      }
+
+      DmsDetection(void);
+
+      DmsDetection*
+      clone(void) const
+      {
+        return new DmsDetection(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return DmsDetection::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "DmsDetection";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 64;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Home Position.
+    class HomePosition: public Message
+    {
+    public:
+      //! Action on the vehicle home position.
+      enum ActiononthevehiclehomepositionEnum
+      {
+        //! Set.
+        OP_SET = 1,
+        //! Report.
+        OP_REPORT = 2
+      };
+
+      //! Action on the vehicle home position.
+      uint8_t op;
+      //! Latitude (WGS-84).
+      fp64_t lat;
+      //! Longitude (WGS-84).
+      fp64_t lon;
+      //! Height (WGS-84).
+      fp32_t height;
+      //! Depth.
+      fp32_t depth;
+      //! Altitude.
+      fp32_t alt;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 909;
+      }
+
+      HomePosition(void);
+
+      HomePosition*
+      clone(void) const
+      {
+        return new HomePosition(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return HomePosition::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "HomePosition";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 29;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Total Magnetic Field Intensity.
+    class TotalMagIntensity: public Message
+    {
+    public:
+      //! Value.
+      fp64_t value;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2006;
+      }
+
+      TotalMagIntensity(void);
+
+      TotalMagIntensity*
+      clone(void) const
+      {
+        return new TotalMagIntensity(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return TotalMagIntensity::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "TotalMagIntensity";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 8;
       }
 
       fp64_t

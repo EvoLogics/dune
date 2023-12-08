@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -83,6 +83,8 @@ namespace UserInterfaces
       std::vector<std::string> sys_addr_sections;
       //! Set of excluded systems.
       std::vector<std::string> sys_exclude;
+      //! Reply to AcousticSystemsQuery requests
+      bool reply_asq;
     };
 
     struct Task: public Tasks::Task
@@ -107,8 +109,12 @@ namespace UserInterfaces
       Command* m_cmd;
       //! Time of last acoustic operation dispatch.
       double m_last_acop;
+      //! Sequence number.
+      uint16_t m_reqid;
       //! Progress bar.
       unsigned m_prog_bar;
+      //! Supported umodem system names.
+      std::set<std::string> m_addrs_umodem;
 
       Task(const std::string& name, Tasks::Context& ctx):
         Tasks::Task(name, ctx),
@@ -117,6 +123,7 @@ namespace UserInterfaces
         m_power_down_now(false),
         m_cmd(0),
         m_last_acop(-1.0),
+        m_reqid(0),
         m_prog_bar(0)
       {
         // Define configuration parameters.
@@ -164,11 +171,15 @@ namespace UserInterfaces
         .defaultValue("broadcast")
         .description("List of excluded systems");
 
+        param("Reply to System Queries", m_args.reply_asq)
+        .defaultValue("false");
+
         // Register listeners.
         bind<IMC::ButtonEvent>(this);
         bind<IMC::AcousticOperation>(this);
         bind<IMC::AcousticSystemsQuery>(this);
         bind<IMC::PowerOperation>(this);
+        bind<IMC::TransmissionStatus>(this);
         bind<IMC::Abort>(this);
       }
 
@@ -183,11 +194,21 @@ namespace UserInterfaces
             {
               std::vector<std::string> addrs = m_ctx.config.options(m_args.sys_addr_sections[i]);
               m_sys.insert(addrs.begin(), addrs.end());
+
+              if(!strcmp(m_args.sys_addr_sections[i].c_str(), "Micromodem Addresses") ||
+                 !strcmp(m_args.sys_addr_sections[i].c_str(), "Micromodem Addresses - DMSMW"))
+                m_addrs_umodem.insert(addrs.begin(), addrs.end());
             }
+
           }
           else
           {
             m_sys.insert(m_args.systems.begin(), m_args.systems.end());
+
+            std::vector<std::string> addrs = m_ctx.config.options("Micromodem Addresses");
+            m_addrs_umodem.insert(addrs.begin(), addrs.end());
+            std::vector<std::string> addrs_dmsmw = m_ctx.config.options("Micromodem Addresses - DMSMW");
+            m_addrs_umodem.insert(addrs_dmsmw.begin(), addrs_dmsmw.end());
           }
 
           // Remove our name from the list.
@@ -250,33 +271,79 @@ namespace UserInterfaces
       void
       requestAbort(const std::string& sys)
       {
-        IMC::AcousticOperation acop;
-        acop.setDestination(getSystemId());
-        acop.system = sys;
-        acop.op = IMC::AcousticOperation::AOP_ABORT;
-        dispatch(&acop, DF_LOOP_BACK);
+        if(m_addrs_umodem.find(sys) != m_addrs_umodem.end())
+        {
+          IMC::AcousticOperation acop;
+          acop.setDestination(getSystemId());
+          acop.system = sys;
+          acop.op = IMC::AcousticOperation::AOP_ABORT;
+          dispatch(&acop, DF_LOOP_BACK);
+        }
+        else
+        {
+          sendMessage(sys, IMC::TransmissionRequest::DMODE_ABORT);
+          abortSystem(sys);
+        }
       }
 
       void
       requestPing(const std::string& sys)
       {
-        IMC::AcousticOperation acop;
-        acop.setDestination(getSystemId());
-        acop.system = sys;
-        acop.op = IMC::AcousticOperation::AOP_RANGE;
-        dispatch(&acop, DF_LOOP_BACK);
+        if(m_addrs_umodem.find(sys) != m_addrs_umodem.end())
+        {
+          IMC::AcousticOperation acop;
+          acop.setDestination(getSystemId());
+          acop.system = sys;
+          acop.op = IMC::AcousticOperation::AOP_RANGE;
+          dispatch(&acop, DF_LOOP_BACK);
+        }
+        else
+        {
+          sendMessage(sys, IMC::TransmissionRequest::DMODE_RANGE);
+          pingSystem(sys);
+        }
       }
+
+      void
+      sendMessage(const std::string& sys, int code){
+        IMC::TransmissionRequest tr;
+        tr.setDestination(getSystemId());
+        tr.destination     = sys;
+        tr.deadline =  Time::Clock::getSinceEpoch() + 10;
+        tr.req_id          = createInternalId();
+        tr.comm_mean       = IMC::TransmissionRequest::CMEAN_ACOUSTIC;
+        tr.data_mode       = code;
+
+        dispatch(&tr, DF_LOOP_BACK);
+
+      }
+
+      uint16_t
+      createInternalId(){
+        if(m_reqid==0xFFFF){
+          m_reqid=0;
+        }
+        else{
+          m_reqid++;
+        }
+        return m_reqid;
+      }
+
 
       void
       consume(const IMC::Abort* msg)
       {
+        if (msg->getDestination() == getSystemId())
+          return;
+        
         requestAbort(resolveSystemId(msg->getDestination()));
       }
 
       void
       consume(const IMC::AcousticSystemsQuery* msg)
       {
-        dispatchReply(*msg, m_acoustic_systems);
+        if (m_args.reply_asq)
+          dispatchReply(*msg, m_acoustic_systems);
       }
 
       void
@@ -318,6 +385,60 @@ namespace UserInterfaces
 
           selectSystem(false);
         }
+      }
+
+      void
+      consume(const IMC::TransmissionStatus* msg)
+      {
+
+        if(msg->getDestination() != getSystemId()) return;
+        if(msg->getDestinationEntity() != getEntityId()) return;
+
+        m_lcd.op = IMC::LcdControl::OP_WRITE1;
+
+        switch (msg->status)
+        {
+          case IMC::TransmissionStatus::TSTAT_TEMPORARY_FAILURE:
+            
+            if (m_mode == MODE_SYS_PING || m_mode == MODE_SYS_ABORT)
+              return;
+            
+            m_lcd.text = fill("Temp. Failure");
+            reset();
+            break;
+
+          case IMC::TransmissionStatus::TSTAT_RANGE_RECEIVED:
+            m_lcd.text = fill(String::str("Range %0.1fm", msg->range));
+            reset();
+            break;
+
+          case IMC::TransmissionStatus::TSTAT_SENT:
+            if (m_mode == MODE_SYS_ABORT)
+            {
+              m_lcd.text = fill("Aborted!");
+              reset();
+            }
+            else if (m_mode == MODE_SYS_PING)
+            {
+              m_lcd.text = fill("Pinged...");
+            }
+            break;
+
+          case IMC::TransmissionStatus::TSTAT_INPUT_FAILURE:
+            m_lcd.text = fill("Timeout/Failure");
+            reset();
+            break;
+
+          case IMC::TransmissionStatus::TSTAT_PERMANENT_FAILURE:
+            m_lcd.text = fill("Permanent Failure");
+            reset();
+            break;
+
+          default:
+            return;
+        }
+
+        dispatch(m_lcd);
       }
 
       void

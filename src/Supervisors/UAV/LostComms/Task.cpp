@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -198,6 +198,7 @@ namespace Supervisors
           p_control.op = IMC::PlanControl::PC_START;
           p_control.type = IMC::PlanControl::PC_REQUEST;
           p_control.flags = IMC::PlanControl::FLG_IGNORE_ERRORS;
+          p_control.setDestination(m_ctx.resolver.id());
           p_control.arg.set(m_plan);
 
           dispatch(p_control);

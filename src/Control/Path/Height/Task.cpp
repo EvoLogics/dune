@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -158,10 +158,15 @@ namespace Control
         }
 
         void
-        onEntityResolution(void)
+        onResourceRelease(void)
         {
-          spew("Entity resolution.");
+          Memory::clear(m_cmd_flt);
+          Memory::clear(m_state_flt);
+        }
 
+        void
+        onResourceAcquisition(void)
+        {
           // Process the systems allowed to define DesiredZ
           m_cmd_flt = new Tasks::SourceFilter(*this, true, m_args.cmd_src, "DesiredZ");
           // Process the systems allowed to pass the EstimatedState

@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -109,6 +109,8 @@ namespace Transports
       void
       onResourceAcquisition(void)
       {
+        bind(this, m_args.messages);
+
         uint16_t last_port = m_args.port + c_max_port_tries;
 
         for (uint16_t port = m_args.port; port < last_port; ++port)
@@ -156,12 +158,6 @@ namespace Transports
       onEntityResolution(void)
       {
         m_msg_mon.setEntities(m_ctx.entities.entries());
-      }
-
-      void
-      onUpdateParameters(void)
-      {
-        bind(this, m_args.messages);
       }
 
       void

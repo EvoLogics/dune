@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -99,6 +99,22 @@ namespace DUNE
       //! @return Base64 encoded string.
       static std::string
       decode(const unsigned char* bytes, size_t len);
+
+      //! Verify if a string is decoded in Base64.
+      //! @param[in] str source string.
+      //! @return true if string is decoded in Base64.
+      static bool
+	  validBase64(const std::string& str)
+      {
+        return validBase64((str.c_str()));
+      }
+
+      //! Verify if a string is decoded in Base64.
+      //! @param[in] str source string.
+      //! @return true if string is decoded in Base64.
+      static bool
+	  validBase64(const char* str);
+
     };
   }
 }

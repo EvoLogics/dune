@@ -1,5 +1,5 @@
 ############################################################################
-# Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      #
+# Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      #
 # Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  #
 ############################################################################
 # This file is part of DUNE: Unified Navigation Environment.               #
@@ -130,6 +130,7 @@ macro(dune_probe_headers)
   dune_test_header(sys/vfs.h)
   dune_test_header(sys/statvfs.h)
   dune_test_header(sys/syscall.h)
+  dune_test_header(sys/reboot.h)
   dune_test_header(termios.h)
   dune_test_header(unistd.h)
   dune_test_header(windows.h)
@@ -148,6 +149,7 @@ macro(dune_probe_headers)
   dune_test_header(libintl.h)
   dune_test_header(syslog.h)
   dune_test_header(float.h)
+  dune_test_header(linux/pps.h)
 
   # A few systems/libraries have non self contained headers (notably
   # OpenBSD and RTEMS), to overcome this we perform the following

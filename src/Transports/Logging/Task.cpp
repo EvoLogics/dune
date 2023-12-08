@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -127,6 +127,16 @@ namespace Transports
       void
       onResourceInitialization(void)
       {
+        if (m_args.messages.empty())
+        {
+          std::vector<std::string> all_abbrevs;
+          IMC::Factory::getAbbrevs(all_abbrevs);
+          bind(this, all_abbrevs);
+          inf("Logging all messages");
+        }
+        else
+          bind(this, m_args.messages);
+
         // Initialize entity state.
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
       }
@@ -143,8 +153,6 @@ namespace Transports
         m_compression = Compression::Factory::method(m_args.lsf_compression);
         if (m_args.lsf_volumes.empty())
           m_args.lsf_volumes.push_back("");
-
-        bind(this, m_args.messages);
       }
 
       void

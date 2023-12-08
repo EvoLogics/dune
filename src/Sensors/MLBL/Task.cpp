@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -936,6 +936,7 @@ namespace Sensors
           pc.op = IMC::PlanControl::PC_START;
           pc.plan_id.assign(plan_name);
           pc.flags = IMC::PlanControl::FLG_IGNORE_ERRORS;
+          pc.setDestination(m_ctx.resolver.id());
           dispatch(pc);
 
           war(DTR("start plan detected"));

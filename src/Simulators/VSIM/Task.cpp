@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -32,6 +32,7 @@
 // ISO C++ 98 headers.
 #include <cmath>
 #include <algorithm>
+#include <string>
 #include <vector>
 #include <stdexcept>
 #include <cstdlib>
@@ -60,10 +61,10 @@ namespace Simulators
     //! %Task arguments.
     struct Arguments
     {
-      //! Stream speed North parameter (m/s).
-      double wx;
-      //! Stream speed East parameter (m/s).
-      double wy;
+      //! Entity label of the stream velocity source.
+      std::string svlabel;
+      //! Simulation time multiplier
+      double time_multiplier;
     };
 
     //! Simulator task.
@@ -75,32 +76,39 @@ namespace Simulators
       Simulators::VSIM::World* m_world;
       //! Simulated position (X,Y,Z).
       IMC::SimulatedState m_sstate;
-      //! Start time.
-      double m_start_time;
       //! Task arguments.
       Arguments m_args;
+      //! Stream velocity.
+      double m_svel[3];
 
       Task(const std::string& name, Tasks::Context& ctx):
         Periodic(name, ctx),
         m_vehicle(NULL),
-        m_world(NULL),
-        m_start_time(Clock::get())
+        m_world(NULL)
       {
-        // Retrieve configuration values.
-        param("Stream Speed North", m_args.wx)
-        .units(Units::MeterPerSecond)
-        .defaultValue("0.0")
-        .description("Water current speed along the North in the NED frame");
+        param("Time Multiplier", m_args.time_multiplier)
+        .defaultValue("1.0")
+        .description("Simulation time multiplier");
 
-        param("Stream Speed East", m_args.wy)
-        .units(Units::MeterPerSecond)
-        .defaultValue("0.0")
-        .description("Water current speed along the East in the NED frame");
+        param("Entity Label - Stream Velocity Source", m_args.svlabel)
+            .defaultValue("Stream Velocity Simulator")
+            .description("Entity label of the stream velocity source.");
 
         // Register handler routines.
         bind<IMC::GpsFix>(this);
         bind<IMC::ServoPosition>(this);
         bind<IMC::SetThrusterActuation>(this);
+        bind<IMC::EstimatedStreamVelocity>(this);
+      }
+
+      void
+      onUpdateParameters(void)
+      {
+        if (m_args.time_multiplier != 1.0)
+        {
+          Time::Clock::setTimeMultiplier(m_args.time_multiplier);
+          war("Using time multiplier: x%.2f", Time::Clock::getTimeMultiplier());
+        }
       }
 
       //! Release allocated resources.
@@ -127,6 +135,10 @@ namespace Simulators
         m_world->addVehicle(m_vehicle);
         m_world->setTimeStep(1.0 / getFrequency());
 
+        m_svel[0] = 0.0;
+        m_svel[1] = 0.0;
+        m_svel[2] = 0.0;
+
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
       }
 
@@ -145,8 +157,6 @@ namespace Simulators
         m_sstate.lon = msg->lon;
         m_sstate.height = msg->height;
 
-        m_start_time = Clock::get();
-
         requestActivation();
 
         // Save message to cache.
@@ -159,7 +169,6 @@ namespace Simulators
       void
       consume(const IMC::ServoPosition* msg)
       {
-        using Simulators::VSIM::UUV;
         UUV* v = static_cast<UUV*>(m_vehicle);
         v->updateFin(msg->id, msg->value);
       }
@@ -168,6 +177,24 @@ namespace Simulators
       consume(const IMC::SetThrusterActuation* msg)
       {
         m_vehicle->updateEngine(msg->id, msg->value);
+      }
+
+      void
+      consume(const IMC::EstimatedStreamVelocity* msg)
+      {
+        // Filter valid messages.
+        if (msg->getSource() != getSystemId() ||
+            resolveEntity(msg->getSourceEntity()) != m_args.svlabel)
+          return;
+
+        m_svel[0] = msg->x;
+        m_svel[1] = msg->y;
+        m_svel[2] = msg->z;
+
+        debug(DTR("Setting stream velocity: %f m/s N : %f m/s E : %f m/s D"),
+              m_svel[0],
+              m_svel[1],
+              m_svel[2]);
       }
 
       void
@@ -180,9 +207,17 @@ namespace Simulators
 
         // Fill position.
         double* position = m_vehicle->getPosition();
-        double sim_time = Clock::get() - m_start_time;
-        m_sstate.x = position[0] + sim_time * m_args.wx;
-        m_sstate.y = position[1] + sim_time * m_args.wy;
+
+        // TODO
+        // This is a temporary fix and this operation should probably be done
+        // inside the Vehicle class.
+        // Add stream velocity.
+        position[0] += m_world->getTimeStep() * m_svel[0];
+        position[1] += m_world->getTimeStep() * m_svel[1];
+        position[2] += m_world->getTimeStep() * m_svel[2];
+
+        m_sstate.x = position[0];
+        m_sstate.y = position[1];
         m_sstate.z = std::max(position[2], 0.0);
 
         // Fill attitude.
@@ -204,9 +239,9 @@ namespace Simulators
         m_sstate.w = lv[2];
 
         // Fill stream velocity.
-        m_sstate.svx = m_args.wx;
-        m_sstate.svy = m_args.wy;
-        m_sstate.svz = 0;
+        m_sstate.svx = m_svel[0];
+        m_sstate.svy = m_svel[1];
+        m_sstate.svz = m_svel[2];
 
         dispatch(m_sstate);
       }

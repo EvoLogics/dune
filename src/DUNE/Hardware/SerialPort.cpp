@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -96,6 +96,9 @@ static std::pair<int, int> brate_pairs[] =
 #  if defined(B921600)
   , std::pair<int, int>(921600, B921600)
 #  endif
+#  if defined(B1000000)
+  , std::pair<int, int>(1000000, B1000000)
+#  endif
 #  if defined(B3000000)
   , std::pair<int, int>(3000000, B3000000)
 #  endif
@@ -185,10 +188,17 @@ namespace DUNE
       return devs;
     }
 
-    SerialPort::SerialPort(const std::string& device, int baudrate, Parity parity, StopBits stopbits, DataBits databits, bool block)
+    SerialPort::SerialPort(const std::string& device, int baudrate, Parity parity, StopBits stopbits, DataBits databits, bool block, bool readonly)
     {
 #if defined(DUNE_OS_POSIX)
-      m_handle = open(device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+      if(readonly)
+      {
+        m_handle = open(device.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK);
+      }
+      else
+      {
+        m_handle = open(device.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+      }
 
       if (m_handle == -1)
       {

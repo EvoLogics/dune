@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -124,6 +124,14 @@ namespace DUNE
       end(void) const
       {
         return m_list.end();
+      }
+
+      //! Check if the list is empty.
+      //! @return true if the list is empty.
+      bool
+      empty(void) const
+      {
+        return m_list.empty();
       }
 
       //! Add a new element at the end of the list, after its current

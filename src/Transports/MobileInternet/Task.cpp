@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -98,6 +98,14 @@ namespace Transports
       bool ip_fwd;
       //! Enable USB Mode switch (USB pen).
       bool code_presentation_mode;
+      //! Enable dynamic DNS
+      bool dyn_dns;
+      //! Dynamic DNS update periodicity
+      double dyn_dns_period;
+      //! Dynamic DNS update url
+      std::string dyn_dns_url;
+      //! Connection timeout (seconds)
+      int conn_timeout;
     };
 
     struct Task: public Tasks::Task
@@ -112,6 +120,8 @@ namespace Transports
       std::string m_command_nat_start;
       //! Stop NAT command.
       std::string m_command_nat_stop;
+      //! Update dynamic DNS command
+      std::string m_command_dyndns_update;
       //! True if modem is powered on.
       bool m_powered;
       //! Current state machine state.
@@ -119,6 +129,11 @@ namespace Transports
       //! Interface IPv4 address.
       Address m_address;
       Time::Counter<double> m_conn_watchdog;
+      Time::Counter<double> m_dyndns_watchdog;
+      //! Are we reactivating the task?
+      bool m_reactivating;
+      //! Connection timeout time in seconds
+      int m_conn_timeout;
 
       Task(const std::string& name, Tasks::Context& ctx):
         Tasks::Task(name, ctx),
@@ -186,15 +201,35 @@ namespace Transports
         .defaultValue("true")
         .description("Enable or disable IP forward");
 
+        param("Enable Dynamic DNS", m_args.dyn_dns)
+        .defaultValue("false")
+        .scope(Tasks::Parameter::SCOPE_GLOBAL)
+        .visibility(Tasks::Parameter::VISIBILITY_USER)
+        .description("Enable or disable Dynamic DNS");
+
+        param("DynDNS Update Periodicity", m_args.dyn_dns_period)
+        .defaultValue("60")
+        .units(Units::Second)
+        .description("Number of seconds between dynamic DNS updates");
+
+        param("DynDNS URL", m_args.dyn_dns_url)
+        .defaultValue("")
+        .description("URL used to update dynamic DNS");
+
         Path script = m_ctx.dir_scripts / "dune-mobile-inet.sh";
-        m_command_connect = String::str("/bin/sh %s start > /dev/null 2>&1", script.c_str());
-        m_command_disconnect = String::str("/bin/sh %s stop > /dev/null 2>&1", script.c_str());
-        m_command_nat_start = String::str("/bin/sh %s nat_start > /dev/null 2>&1", script.c_str());
-        m_command_nat_stop = String::str("/bin/sh %s nat_stop > /dev/null 2>&1", script.c_str());
+        m_command_connect = String::str("/bin/sh %s start >> /dev/null 2>&1", script.c_str());
+        m_command_disconnect = String::str("/bin/sh %s stop >> /dev/null 2>&1", script.c_str());
+        m_command_nat_start = String::str("/bin/sh %s nat_start >> /dev/null 2>&1", script.c_str());
+        m_command_nat_stop = String::str("/bin/sh %s nat_stop >> /dev/null 2>&1", script.c_str());
+        m_command_dyndns_update = String::str("/bin/sh %s dyndns_update >> /dev/null 2>&1", script.c_str());
 
         bind<IMC::PowerChannelState>(this);
 
-        m_conn_watchdog.setTop(60);
+        m_conn_timeout = 30;
+
+        m_conn_watchdog.setTop(m_conn_timeout);
+
+        m_reactivating = false;
       }
 
       ~Task(void)
@@ -207,12 +242,16 @@ namespace Transports
       {
         if (m_args.power_channel.empty())
           m_powered = true;
+
+        if (paramChanged(m_args.dyn_dns_period))
+          m_dyndns_watchdog.setTop(m_args.dyn_dns_period);
       }
 
       void
       consume(const IMC::PowerChannelState* msg)
       {
-        if (msg->name != m_args.power_channel)
+
+    	if (msg->name != m_args.power_channel)
           return;
 
         m_powered = (msg->state == IMC::PowerChannelState::PCS_ON);
@@ -234,8 +273,28 @@ namespace Transports
       void
       onRequestDeactivation(void)
       {
-        m_sm_state = SM_DEACT_BEGIN;
-        updateStateMachine();
+    	m_sm_state = SM_DEACT_BEGIN;
+    	updateStateMachine();
+      }
+
+      void
+	  onDeactivation(void)
+      {
+    	if (m_reactivating)
+    	{
+    	  m_reactivating = false;
+    	  requestActivation();
+    	}
+      }
+
+      void
+	  requestReactivation(void)
+      {
+    	m_reactivating = true;
+    	m_conn_timeout = std::min(m_conn_timeout + 10, 240);
+    	debug("Retrying connection using %d seconds timeout.", m_conn_timeout);
+    	m_conn_watchdog.setTop(m_conn_timeout);
+    	requestDeactivation();
       }
 
       void
@@ -295,11 +354,16 @@ namespace Transports
         else
           Environment::set("PRESENTATION_MODE", "AT");
 
-        if (std::system(m_command_connect.c_str()) == -1)
+        int ret = std::system(m_command_connect.c_str());
+        if (ret == -1)
         {
           err(DTR("failed to execute connect command"));
           return false;
         }
+        else {
+        	debug("PPP start returned %d.", ret);
+        }
+
         return true;
       }
 
@@ -353,9 +417,25 @@ namespace Transports
       }
 
       void
+      updateDynDNS()
+      {
+
+        inf("Updating dynamic dns.");
+
+        if (!m_args.dyn_dns)
+          return;
+
+        Environment::set("DYNDNS_URL", m_args.dyn_dns_url);
+        if (std::system(m_command_dyndns_update.c_str()) == -1)
+          err(DTR("failed to update dynamic DNS"));
+
+        m_dyndns_watchdog.reset();
+      }
+
+      void
       updateStateMachine(void)
       {
-        switch (m_sm_state)
+    	switch (m_sm_state)
         {
           case SM_IDLE:
             break;
@@ -364,15 +444,15 @@ namespace Transports
             debug("starting activation sequence");
             setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVATING);
             if (!m_args.power_channel.empty())
-             m_sm_state = SM_ACT_POWER_ON;
+              m_sm_state = SM_ACT_POWER_ON;
             else
               m_sm_state = SM_ACT_MODEM_WAIT;
-            /* no break */
+            /* Falls through */
 
           case SM_ACT_POWER_ON:
             turnPowerOn();
             m_sm_state = SM_ACT_POWER_WAIT;
-            /* no break */
+            /* Falls through */
 
           case SM_ACT_POWER_WAIT:
             if (isPowered())
@@ -383,9 +463,10 @@ namespace Transports
             }
             else
             {
+              spew("waiting for power to be on");
               break;
             }
-            /* no break */
+            /* Falls through */
 
           case SM_ACT_MODEM_WAIT:
             if (Path(m_args.uart_dev).isDevice() || Path(m_args.uart_dev).isLink())
@@ -398,30 +479,32 @@ namespace Transports
               debug("No modem detected in %s, retrying...", m_args.uart_dev.c_str());
               break;
             }
+            /* Falls through */
 
           case SM_ACT_CONNECT:
             connect();
             debug("connection succeeded");
             m_sm_state = SM_ACT_DONE;
             m_conn_watchdog.reset();
-            /* no break */
+            /* Falls through */
 
           case SM_ACT_DONE:
+            if (!isActive())
+            	activate();
             debug("activation complete");
-            activate();
+
             m_sm_state = SM_ACT_CONNECTING;
-            /* no break */
+            /* Falls through */
 
           case SM_ACT_CONNECTING:
             if (m_conn_watchdog.overflow())
             {
-              err("Connection timed out");
-              requestDeactivation();
-              requestActivation();
+              war("Connection timed out. Retrying...");
+              requestReactivation();
             }
             if (isConnected(&m_address))
             {
-              debug("connected: %s", m_address.c_str());
+              inf("connected: %s", m_address.c_str());
               startNAT();
               setEntityState(IMC::EntityState::ESTA_NORMAL,
                              String::str(DTR("connected to the Internet with public address '%s'"), m_address.c_str()));
@@ -443,7 +526,7 @@ namespace Transports
           case SM_DEACT_BEGIN:
             setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_DEACTIVATING);
             m_sm_state = SM_DEACT_DISCONNECT;
-            /* no break */
+            /* Falls through */
 
           case SM_DEACT_DISCONNECT:
             disconnect();
@@ -456,7 +539,7 @@ namespace Transports
           case SM_DEACT_POWER_OFF:
             turnPowerOff();
             m_sm_state = SM_DEACT_POWER_WAIT;
-            /* no break */
+            /* Falls through */
 
           case SM_DEACT_POWER_WAIT:
             if (!isPowered())
@@ -468,13 +551,13 @@ namespace Transports
             {
               break;
             }
-            /* no break */
+            /* Falls through */
 
           case SM_DEACT_DONE:
             debug("deactivation complete");
             setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
-            deactivate();
             m_sm_state = SM_IDLE;
+            deactivate();
             break;
         }
       }
@@ -486,6 +569,11 @@ namespace Transports
         {
           waitForMessages(1.0);
           updateStateMachine();
+
+          if(m_args.dyn_dns && m_dyndns_watchdog.overflow() && isConnected())
+          {
+            updateDynDNS();
+          }
         }
       }
     };

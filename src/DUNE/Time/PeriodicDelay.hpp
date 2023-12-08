@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -40,6 +40,7 @@
 
 // DUNE headers.
 #include <DUNE/Time/Constants.hpp>
+#include <DUNE/Time/Clock.hpp>
 
 namespace DUNE
 {
@@ -58,6 +59,9 @@ namespace DUNE
       void
       set(uint32_t delay_usec)
       {
+
+        delay_usec = (uint32_t) (delay_usec / Clock::getTimeMultiplier());
+
         // Microsoft Windows.
 #if defined(DUNE_SYS_HAS_GET_SYSTEM_TIME_AS_FILE_TIME)
         m_delay = delay_usec * 10;

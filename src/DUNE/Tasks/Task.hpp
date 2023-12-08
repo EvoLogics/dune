@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -447,6 +447,13 @@ namespace DUNE
         return entity;
       }
 
+      //! Retrieve pointer to a previously stored entity object
+      //! object.
+      //! @param[in] label entity name/label.
+      //! @return pointer to entity object.
+      Entities::BasicEntity*
+      getLocalEntity(const std::string& label);
+
       //! Test if task is stopping.
       //! @return true if task is stopping, false otherwise.
       bool
@@ -599,6 +606,17 @@ namespace DUNE
         for (unsigned int i = 0; i < list.size(); ++i)
           bind(IMC::Factory::getIdFromAbbrev(list[i]),
                new Consumer<T, IMC::Message>(*task_obj, func));
+      }
+
+      //! Register a consumer for a given message identifier.
+      //! @param[in] message_id message identifier.
+      //! @param[in] consumer consumer object.
+      void
+      bind(unsigned int message_id, AbstractConsumer* consumer)
+      {
+        spew("registering consumer for '%s'",
+             IMC::Factory::getAbbrevFromId(message_id).c_str());
+        m_recipient->bind(message_id, consumer);
       }
 
       //! Request task to start/resume normal execution.
@@ -801,17 +819,6 @@ namespace DUNE
 
       void
       run(void);
-
-      //! Register a consumer for a given message identifier.
-      //! @param[in] message_id message identifier.
-      //! @param[in] consumer consumer object.
-      void
-      bind(unsigned int message_id, AbstractConsumer* consumer)
-      {
-        spew("registering consumer for '%s'",
-             IMC::Factory::getAbbrevFromId(message_id).c_str());
-        m_recipient->bind(message_id, consumer);
-      }
 
       //! Consume QueryEntityState messages and reply accordingly.
       //! @param[in] msg QueryEntityState message.

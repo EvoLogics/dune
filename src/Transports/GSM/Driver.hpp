@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -74,16 +74,17 @@ namespace Transports
         IMC::TextMessage sms;
         std::string location;
         unsigned read_count = 0;
-
+        bool text_mode = true;
         sendAT("+CMGL=\"ALL\"");
 
         //! Read all messages.
-        while (readSMS(location, sms.origin, sms.text))
+        while (readSMS(location, sms.origin, sms.text,text_mode))
         {
           if ((location == "\"REC UNREAD\"") || (location == "\"REC READ\""))
           {
             ++read_count;
-            getTask()->dispatch(sms);
+            if(text_mode)
+            	getTask()->dispatch(sms);
           }
         }
 
@@ -93,6 +94,53 @@ namespace Transports
           sendAT("+CMGD=0,3");
           expectOK();
         }
+      }
+
+      std::string
+      getOwnNumber(void)
+      {
+        try
+        {
+          sendAT("+CPBS=ON");
+          expectOK();
+          sendAT("+CPBS?");
+          std::string line = readLine();
+          int n_registered_numbers = 0;
+          int n_total_capacity = 0;
+          if (std::sscanf(line.c_str(), "+CPBS: \"ON\",%d,%d",
+                          &n_registered_numbers, &n_total_capacity) == 2)
+          {
+            expectOK();
+            if (n_registered_numbers > 0)
+            {
+              sendAT("+CPBR=1");
+              line = readLine();
+              int n_index;
+              char n_number[20];
+              int n_type;
+              char n_name[20];
+              if (std::sscanf(line.c_str(), "+CPBR: %d,\"%[^\"]\",%d,\"%[^\"]", &n_index,
+                              n_number,&n_type,n_name) == 4)
+              {
+                expectOK();
+                if (n_index == 1)
+                {
+
+                  getTask()->inf(DTR("SIM card number: %s"), n_number);
+                  return std::string(n_number);
+                }
+              }
+
+            }
+          }
+        }
+        catch (...)
+        {
+          getTask()->inf("SIM card number: not found");
+          return "";
+        }
+        return "";
+
       }
 
       void
@@ -143,6 +191,42 @@ namespace Transports
         }
 
         expectOK();
+      }
+
+      bool
+      getBalance(unsigned ussd_code, std::string &balance)
+      {
+        char code[50];
+        sprintf(code,"+CUSD=1,\"*#%d#\"",ussd_code);
+        sendAT(code);
+
+        try{
+          expectOK();
+        }
+        catch(...) {
+          getTask()->war("Can't read balance. Please check the USSD code or connection");
+          return false;
+        }
+        std::string msg = readLine();
+        Utils::String::toLowerCase(msg);
+
+        size_t startPos = msg.find("saldo:");
+
+        if(startPos == std::string::npos) {
+          getTask()->war("Can't read balance");
+          return false;
+        }
+
+        std::string firstPart = msg.substr(startPos);
+        balance = firstPart.substr(6, firstPart.find("eur")-6);
+
+        getTask()->debug("Saldo: %s", balance.c_str());
+
+        std::stringstream ss;
+        ss << " | " << String::str(balance) << "Eur ";
+        balance = ss.str();
+
+        return true;
       }
 
     private:
@@ -217,7 +301,12 @@ namespace Transports
           return true;
         if (String::startsWith(str, "^RSSI"))
           return true;
-
+        if(String::startsWith(str, "+CRING")) //incoming call
+        	return true;
+        if(String::startsWith(str, "^CEND:")) //end of call
+                	return true;
+        if(String::startsWith(str, "NO CARRIER")) //missed call
+        	return true;
         return false;
       }
 
@@ -250,7 +339,7 @@ namespace Transports
       }
 
       bool
-      readSMS(std::string& location, std::string& origin, std::string& text)
+      readSMS(std::string& location, std::string& origin, std::string& text, bool& text_mode)
       {
         std::string header = readLine();
         if (header == "OK")
@@ -277,7 +366,35 @@ namespace Transports
 
         location = parts[1];
         origin = std::string(parts[2], 1, parts[2].size() - 2);
-        text = readLine();
+        std::string incoming_data = readLine();
+
+        if(Algorithms::Base64::validBase64(incoming_data))
+        {
+          text_mode = false;
+          Utils::ByteBuffer bfr;
+          bfr.setSize(incoming_data.length());
+          std::string decoded = Algorithms::Base64::decode(incoming_data);
+          std::copy(decoded.begin(),decoded.end(),bfr.getBuffer());
+          uint16_t length = decoded.size();
+          try
+          {
+            IMC::Message* msg_d = IMC::Packet::deserialize(bfr.getBuffer(), length);
+            getTask()->inf(DTR("received IMC message of type %s via SMS"),msg_d->getName());
+            getTask()->dispatch(msg_d);
+          }
+          catch(...) //InvalidSync || InvalidMessageId || InvalidCrc
+          {
+            getTask()->war(DTR("Parsing unrecognized Base64 message as text"));
+            text.assign(incoming_data);
+            text_mode = true;
+            return true;
+          }
+        }
+        else
+        {
+          text.assign(incoming_data);
+          text_mode = true;
+        }
         return true;
       }
     };

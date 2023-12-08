@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -48,6 +48,8 @@ namespace Transports
       int max_age_secs;
       //! Destination to send all iridium messages
       std::string iridium_destination;
+      //! Text messages received over Iridium are tagged with this origin
+      std::string text_origin;
     };
 
     struct Task: public DUNE::Tasks::Task
@@ -59,6 +61,7 @@ namespace Transports
       bool m_announce_pool_empty;
       int m_dev_update_req_id;
       int m_announce_req_id;
+      uint16_t req_id;
 
       IMC::FuelLevel m_fuel_state;
       IMC::PlanControlState m_plan_state;
@@ -74,6 +77,7 @@ namespace Transports
         m_announce_pool_empty(true),
         m_dev_update_req_id(10),
         m_announce_req_id(75),
+        req_id(0),
         m_rnd(NULL)
       {
         paramActive(Tasks::Parameter::SCOPE_GLOBAL,
@@ -92,6 +96,10 @@ namespace Transports
         .units(Units::Second)
         .defaultValue("1200")
         .description("Age, in seconds, after which received IMC messages are discarded.");
+
+        param("Iridium Text Origin", m_args.text_origin)
+        .description("Text messages received via Iridium will be tagged with this origin")
+        .defaultValue("iridium");
 
         bind<IMC::Announce>(this);
         bind<IMC::IridiumMsgRx>(this);
@@ -139,7 +147,7 @@ namespace Transports
         IMC::TextMessage tm;
         inf("received command: '%s'", irCmd->command.c_str());
         tm.text = irCmd->command;
-        tm.origin = "Iridium";
+        tm.origin = m_args.text_origin;
         tm.setSource(irCmd->source);
         std::stringstream ss;
         tm.toText(ss);
@@ -165,6 +173,8 @@ namespace Transports
           sensorInfo.lat = p.lat;
           sensorInfo.lon = p.lon;
           sensorInfo.heading = 0;
+
+          war("  System %X is at (%.5f, %.5f).", p.id, Angles::degrees(p.lat), Angles::degrees(p.lon));
 
           std::string name = resolveSystemId(p.id);
 
@@ -221,7 +231,7 @@ namespace Transports
           std::string text(msg->data.begin(), msg->data.end());
           IMC::TextMessage tm;
           tm.text = text;
-          tm.origin = "Iridium (text)";
+          tm.origin = "iridium";
           std::stringstream ss;
           tm.toText(ss);
           spew("sending this message to bus: %s", ss.str().c_str());
@@ -254,8 +264,10 @@ namespace Transports
             double age = Clock::getSinceEpoch() - irMsg->msg->getTimeStamp();
             if (age < m_args.max_age_secs)
             {
-              inf("received IMC message of type %s via Iridium.", irMsg->msg->getName());
-              dispatch(irMsg->msg);
+              inf("received IMC message of type %s via Iridium from %d.", irMsg->msg->getName(), irMsg->source);
+              IMC::Message* m2 = irMsg->msg;
+              m2->setSource(irMsg->source);
+              dispatch(m2);
             }
             else
             {
@@ -332,7 +344,7 @@ namespace Transports
 
         if (m_last_announces.find(getSystemName()) != m_last_announces.end())
         {
-          Announce ann = m_last_announces[getSystemName()];
+          IMC::Announce* ann = &m_last_announces[getSystemName()];
 
           std::stringstream ss;
           if (m_plan_state.state == IMC::PlanControlState::PCS_EXECUTING)
@@ -343,20 +355,10 @@ namespace Transports
           if (m_vehicle_state.error_count > 0)
             ss << "E:" << m_vehicle_state.last_error;
 
-          ann.services = ss.str();
-          DUNE::IMC::ImcIridiumMessage irMsg(&ann);
-          irMsg.source = getSystemId();
-          irMsg.destination = 65535;
-          uint8_t buffer[65535];
-          int len = irMsg.serialize(buffer);
+          ann->services = ss.str();
 
-          DUNE::IMC::IridiumMsgTx m;
-          m.data.assign(buffer, buffer + len);
-          m.req_id = m_rnd->random() % 65535;
-          m_announce_req_id = m.req_id;
-          m.ttl = 60;
-          m.setTimeStamp();
-          dispatch(m);
+          sendIridiumMsg(ann);
+
           m_announce_pool_empty = false;
           return true;
         }
@@ -374,8 +376,7 @@ namespace Transports
         }
 
         debug("queuing device updates");
-        DUNE::IMC::DeviceUpdate msg;
-        uint8_t buffer[65535];
+        IMC::DeviceUpdate msg;
         std::map<std::string, IMC::Announce>::iterator it;
 
         for (it = m_last_announces.begin(); it != m_last_announces.end(); it++)
@@ -394,21 +395,52 @@ namespace Transports
         msg.source = getSystemId();
         msg.destination = 0xFFFF;
 
-        IMC::IridiumMsgTx m;
-        int len = msg.serialize(buffer);
-        m.data.assign(buffer, buffer + len);
-        m.req_id = m_rnd->random() % 65535;
-        m.ttl = 60;
-        m.setTimeStamp();
-        m_dev_update_req_id = m.req_id;
-        dispatch(m);
 
-        std::stringstream ss;
-        m.toText(ss);
-        spew("sent the following message: %s", ss.str().c_str());
+        sendIridiumMsg(&msg);
+
         m_update_pool_empty = false;
 
         return true;
+      }
+
+      void
+      sendIridiumMsg(IMC::DeviceUpdate* msg)
+      {
+
+        IMC::TransmissionRequest tr;
+        tr.data_mode     = IMC::TransmissionRequest::DMODE_RAW;
+        tr.comm_mean     = IMC::TransmissionRequest::CMEAN_SATELLITE;
+        tr.req_id        = req_id++;
+        tr.deadline      = Time::Clock::getSinceEpoch() + 60;
+        uint8_t buffer[65535];
+        int len = msg->serialize(buffer);
+        tr.raw_data.assign(buffer, buffer + len);
+
+        m_dev_update_req_id = tr.req_id;
+
+        dispatch(tr);
+        std::stringstream ss;
+        tr.toText(ss);
+        spew("sent the following message: %s", ss.str().c_str());
+      }
+
+      void
+      sendIridiumMsg(const IMC::Message* msg)
+      {
+
+        IMC::TransmissionRequest tr;
+        tr.data_mode     = IMC::TransmissionRequest::DMODE_INLINEMSG;
+        tr.comm_mean     = IMC::TransmissionRequest::CMEAN_SATELLITE;
+        tr.req_id        = req_id++;
+        tr.msg_data.set(msg->clone());
+        tr.deadline      = Time::Clock::getSinceEpoch() + 60;
+
+        m_announce_req_id= tr.req_id;
+
+        dispatch(tr);
+        std::stringstream ss;
+        tr.toText(ss);
+        spew("sent the following message: %s", ss.str().c_str());
       }
 
       void

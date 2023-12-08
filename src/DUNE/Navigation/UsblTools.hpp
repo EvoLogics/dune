@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 OceanScan - Marine Systems & Technology, Lda.        *
+// Copyright 2007-2021 OceanScan - Marine Systems & Technology, Lda.        *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
 //                                                                          *
@@ -25,6 +25,7 @@
 //***************************************************************************
 // Author: José Braga                                                       *
 // Author: Raúl Sáez                                                        *
+// Author: Luis Venancio                                                    *
 //***************************************************************************
 
 #ifndef DUNE_NAVIGATION_USBL_TOOLS_HPP_INCLUDED_
@@ -35,6 +36,8 @@
 #include <vector>
 
 // DUNE headers.
+#include <DUNE/Tasks/Task.hpp>
+#include <DUNE/Time/Counter.hpp>
 #include <DUNE/Coordinates.hpp>
 #include <DUNE/IMC/Definitions.hpp>
 
@@ -49,19 +52,23 @@ namespace DUNE
     {
     public:
       //! Request frame: start/stop mask.
-      static const uint8_t c_mask_start = 0x10;
+      static constexpr uint8_t c_mask_start = 0x10;
       //! Request frame: absolute fix mask.
-      static const uint8_t c_mask_fix = 0x01;
+      static constexpr uint8_t c_mask_fix = 0x01;
+      //! Request frame: inverted mode.
+      static constexpr uint8_t c_mask_inverted = 0x02;
       //! Request frame: size of frame.Size of frame: request.
-      static const uint8_t c_fsize_req = 5;
+      static constexpr uint8_t c_fsize_req = 5;
       //! Node or modem destination identifier mask.
-      static const uint8_t c_target_mask = 0x80;
+      static constexpr uint8_t c_target_mask = 0x80;
       //! Code placement in received frame messages.
-      static const uint8_t c_code = 2;
+      static constexpr uint8_t c_code = 2;
       //! Minimum time interval between consecutive requests from node.
-      static const uint16_t c_requests_interval = 30;
+      static constexpr uint16_t c_requests_interval = 30;
       //! Number of communication timeouts before considering that a system has failed.
-      static const uint8_t c_max_comm_timeout = 5;
+      static constexpr uint8_t c_max_comm_timeout = 5;
+      //! Origin validity timeout.
+      static constexpr uint8_t c_origin_timeout = 5;
 
       enum Codes
       {
@@ -69,7 +76,9 @@ namespace DUNE
         CODE_RPL = c_target_mask,
         CODE_FIX = c_target_mask | 0x01,
         CODE_POS = c_target_mask | 0x02,
-        CODE_ANG = c_target_mask | 0x03
+        CODE_ANG = c_target_mask | 0x03,
+        CODE_INV = c_target_mask | 0x04,
+        CODE_ORG = 0x05
       };
 
       enum RequestIndexes
@@ -86,6 +95,107 @@ namespace DUNE
         fp32_t z;
         uint8_t z_units;
         fp32_t accuracy;
+
+        //! Decode an incoming data frame into a fix message.
+        //! @param[out] frame fix structure.
+        //! @param[in] data incoming frame.
+        static void
+        decode(Fix& frame, const std::vector<char>& data)
+        {
+          uint8_t* ptr = (uint8_t*)&data[c_code + 1];
+
+          uint16_t length = (uint16_t)Fix::size();
+          ptr += IMC::deserialize(frame.lat, ptr, length);
+          ptr += IMC::deserialize(frame.lon, ptr, length);
+          ptr += IMC::deserialize(frame.z, ptr, length);
+          ptr += IMC::deserialize(frame.z_units, ptr, length);
+          ptr += IMC::deserialize(frame.accuracy, ptr, length);
+        }
+
+        //! Encode a fix message into a data frame.
+        //! @param[in] frame fix structure.
+        //! @param[out] data data frame.
+        static void
+        encode(Fix& frame, std::vector<uint8_t>& data)
+        {
+          data.resize(Fix::size() + 2);
+          data[c_code - 1] = CODE_FIX;
+
+          uint8_t* ptr = (uint8_t*)&data[c_code];
+
+          ptr += IMC::serialize(frame.lat, ptr);
+          ptr += IMC::serialize(frame.lon, ptr);
+          ptr += IMC::serialize(frame.z, ptr);
+          ptr += IMC::serialize(frame.z_units, ptr);
+          ptr += IMC::serialize(frame.accuracy, ptr);
+        }
+
+        //! Get size of frame.
+        //! @return size of fix structure.
+        static size_t
+        size(void)
+        {
+          return 2 * (sizeof(fp64_t) + sizeof(fp32_t)) + sizeof(uint8_t);
+        }
+      };
+
+      struct Gps
+      {
+        fp64_t lat;
+        fp64_t lon;
+        fp32_t z;
+
+        //! Decode an incoming data frame into a gps message.
+        //! @param[out] frame gps structure.
+        //! @param[in] data incoming frame.
+        static void
+        decode(Gps& frame, const std::vector<char>& data)
+        {
+          uint8_t* ptr = (uint8_t*)&data[c_code + 1];
+
+          uint16_t length = (uint16_t)Gps::size();
+          ptr += IMC::deserialize(frame.lat, ptr, length);
+          ptr += IMC::deserialize(frame.lon, ptr, length);
+          ptr += IMC::deserialize(frame.z, ptr, length);
+        }
+
+        //! Encode a fix message into a data frame.
+        //! @param[in] frame fix structure.
+        //! @param[out] data data frame.
+        static void
+        encode(Gps& frame, std::vector<uint8_t>& data)
+        {
+          data.resize(Gps::size() + 2);
+          data[c_code - 1] = CODE_ORG;
+
+          uint8_t* ptr = (uint8_t*)&data[c_code];
+
+          ptr += IMC::serialize(frame.lat, ptr);
+          ptr += IMC::serialize(frame.lon, ptr);
+          ptr += IMC::serialize(frame.z, ptr);
+        }
+
+        //! Decode an incoming data frame into a gps message.
+        //! @param[out] frame gps structure.
+        //! @param[in] data incoming frame.
+        static void
+        decode(IMC::GpsFix& msg, const std::vector<char>& data)
+        {
+          uint8_t* ptr = (uint8_t*)&data[c_code + 1];
+
+          uint16_t length = (uint16_t)Gps::size();
+          ptr += IMC::deserialize(msg.lat, ptr, length);
+          ptr += IMC::deserialize(msg.lon, ptr, length);
+          ptr += IMC::deserialize(msg.height, ptr, length);
+        }
+
+        //! Get size of frame.
+        //! @return size of fix structure.
+        static size_t
+        size(void)
+        {
+          return 2 * sizeof(fp64_t) + sizeof(fp32_t);
+        }
       };
 
       //! Position data structure.
@@ -97,7 +207,53 @@ namespace DUNE
         fp32_t n;
         fp32_t e;
         fp32_t d;
-        fp32_t accuracy;
+        uint8_t accuracy;
+
+        //! Decode an incoming data frame into a position message.
+        //! @param[out] frame position structure.
+        //! @param[in] data incoming frame.
+        static void
+        decode(Position& frame, const std::vector<char>& data)
+        {
+          uint8_t* ptr = (uint8_t*)&data[c_code + 1];
+
+          uint16_t length = (uint16_t)Position::size();
+          ptr += IMC::deserialize(frame.x, ptr, length);
+          ptr += IMC::deserialize(frame.y, ptr, length);
+          ptr += IMC::deserialize(frame.z, ptr, length);
+          ptr += IMC::deserialize(frame.n, ptr, length);
+          ptr += IMC::deserialize(frame.e, ptr, length);
+          ptr += IMC::deserialize(frame.d, ptr, length);
+          ptr += IMC::deserialize(frame.accuracy, ptr, length);
+        }
+
+        //! Encode a position message into a data frame.
+        //! @param[in] frame position structure.
+        //! @param[out] data data frame.
+        static void
+        encode(Position& frame, std::vector<uint8_t>& data)
+        {
+          data.resize(Position::size() + 2);
+          data[c_code - 1] = CODE_POS;
+
+          uint8_t* ptr = (uint8_t*)&data[c_code];
+
+          ptr += IMC::serialize(frame.x, ptr);
+          ptr += IMC::serialize(frame.y, ptr);
+          ptr += IMC::serialize(frame.z, ptr);
+          ptr += IMC::serialize(frame.n, ptr);
+          ptr += IMC::serialize(frame.e, ptr);
+          ptr += IMC::serialize(frame.d, ptr);
+          ptr += IMC::serialize(frame.accuracy, ptr);
+        }
+
+        //! Get size of frame.
+        //! @return size of position structure.
+        static size_t
+        size(void)
+        {
+          return (6 * sizeof(fp32_t) + sizeof(uint8_t));
+        }
       };
 
       //! Angles data structure.
@@ -108,6 +264,48 @@ namespace DUNE
         fp32_t bearing;
         fp32_t elevation;
         fp32_t accuracy;
+
+        //! Decode an incoming data frame into an angles message.
+        //! @param[out] frame angles structure.
+        //! @param[in] data incoming frame.
+        static void
+        decode(Angles& frame, const std::vector<char>& data)
+        {
+          uint8_t* ptr = (uint8_t*)&data[c_code + 1];
+
+          uint16_t length = (uint16_t)Angles::size();
+          ptr += IMC::deserialize(frame.lbearing, ptr, length);
+          ptr += IMC::deserialize(frame.lelevation, ptr, length);
+          ptr += IMC::deserialize(frame.bearing, ptr, length);
+          ptr += IMC::deserialize(frame.elevation, ptr, length);
+          ptr += IMC::deserialize(frame.accuracy, ptr, length);
+        }
+
+        //! Encode an angles message into a data frame.
+        //! @param[in] frame angles structure.
+        //! @param[out] data data frame.
+        static void
+        encode(Angles& frame, std::vector<uint8_t>& data)
+        {
+          data.resize(Angles::size() + 2);
+          data[c_code - 1] = CODE_ANG;
+
+          uint8_t* ptr = (uint8_t*)&data[c_code];
+
+          ptr += IMC::serialize(frame.lbearing, ptr);
+          ptr += IMC::serialize(frame.lelevation, ptr);
+          ptr += IMC::serialize(frame.bearing, ptr);
+          ptr += IMC::serialize(frame.elevation, ptr);
+          ptr += IMC::serialize(frame.accuracy, ptr);
+        }
+
+        //! Get size of frame.
+        //! @return size of angles structure.
+        static size_t
+        size(void)
+        {
+          return 5 * sizeof(fp32_t);
+        }
       };
 
       //! This method checks if code is intended for nodes or USBL modem.
@@ -123,23 +321,26 @@ namespace DUNE
       }
 
       static IMC::UsblFixExtended
-      toFix(const IMC::UsblPositionExtended& usbl, const IMC::GpsFix& gps)
+      toFix(const IMC::UsblPositionExtended& usbl, const IMC::GpsFix& gps, bool inverted = false)
       {
-        return toFix(usbl, gps.lat, gps.lon, gps.height, IMC::Z_HEIGHT);
+        return toFix(usbl, gps.lat, gps.lon, gps.height, IMC::Z_HEIGHT, inverted);
       }
 
       static IMC::UsblFixExtended
-      toFix(const IMC::UsblPositionExtended& usbl, const IMC::EstimatedState& state)
+      toFix(const IMC::UsblPositionExtended& usbl, const IMC::EstimatedState& state, bool inverted = false)
       {
         double lat, lon;
         Coordinates::toWGS84(state, lat, lon);
-        return toFix(usbl, lat, lon, state.depth, IMC::Z_DEPTH);
+        return toFix(usbl, lat, lon, state.depth, IMC::Z_DEPTH, inverted);
       }
 
       static IMC::UsblFixExtended
-      toFix(const IMC::UsblPositionExtended& usbl, double lat, double lon, float z, IMC::ZUnits z_units)
+      toFix(const IMC::UsblPositionExtended& usbl, double lat, double lon, float z, IMC::ZUnits z_units, bool inverted = false)
       {
-        Coordinates::WGS84::displace(usbl.n, usbl.e, &lat, &lon);
+        if (!inverted)
+          Coordinates::WGS84::displace(usbl.n, usbl.e, &lat, &lon);
+        else
+          Coordinates::WGS84::displace(-usbl.n, -usbl.e, &lat, &lon);
 
         IMC::UsblFixExtended fix;
         fix.target = usbl.target;
@@ -160,7 +361,7 @@ namespace DUNE
       class Node
       {
       public:
-        //! Target arguments.
+        //! Node arguments.
         struct Arguments
         {
           //! True to enable target request.
@@ -171,18 +372,20 @@ namespace DUNE
           bool fix;
           //! Quick mode, without range.
           bool no_range;
+          //! Inverted mode.
+          bool inverted;
         };
 
         //! Constructor.
-        Node(Tasks::Task* task, const Arguments* args):
+        Node(Tasks::Task* const task, const Arguments* args):
+          m_args(args),
           m_usbl_alive(false),
           m_wait_reply(false),
-          m_args(args),
+          m_fix(m_args->fix),
+          m_inverted(m_args->inverted),
+          m_period(m_args->period),
           m_task(task)
         {
-          m_period = m_args->period;
-          m_fix = m_args->fix;
-
           // in quick mode, we actively ping the modem
           if (m_args->no_range)
           {
@@ -235,9 +438,12 @@ namespace DUNE
         }
 
         //! Parse incoming frame.
+        //! @param[in] imc_src IMC id of message source.
         //! @param[in] msg received acoustic frame.
-        void
-        parse(uint16_t imc_src, const IMC::UamRxFrame* msg)
+        //! @param[out] data frame to be send.
+        //! @return true if there's data to be sent, false otherwise.
+        bool
+        parse(uint16_t imc_src, const IMC::UamRxFrame* msg, std::vector<uint8_t>& data)
         {
           switch ((uint8_t)msg->data[c_code])
           {
@@ -250,6 +456,7 @@ namespace DUNE
                 {
                   std::memcpy(&m_period, &msg->data[REQ_PERIOD], sizeof(uint16_t));
                   m_fix = msg->data[REQ_START] & c_mask_fix;
+                  m_inverted = msg->data[REQ_START] & c_mask_inverted;
                   m_usbl_alive = true;
                   m_comm_timeout_timer.setTop(c_max_comm_timeout * m_period);
                 }
@@ -257,15 +464,13 @@ namespace DUNE
                 {
                   m_usbl_alive = false;
                 }
-
-                m_usbl_name = msg->sys_src;
               }
               break;
 
             case CODE_FIX:
             {
               UsblTools::Fix fs;
-              std::memcpy(&fs, &msg->data[c_code + 1], sizeof(UsblTools::Fix));
+              Fix::decode(fs, msg->data);
 
               IMC::UsblFixExtended fix;
               fix.setSource(imc_src);
@@ -286,7 +491,7 @@ namespace DUNE
             case CODE_POS:
             {
               UsblTools::Position ps;
-              std::memcpy(&ps, &msg->data[c_code + 1], sizeof(UsblTools::Position));
+              Position::decode(ps, msg->data);
 
               IMC::UsblPositionExtended pos;
               pos.setSource(imc_src);
@@ -297,7 +502,7 @@ namespace DUNE
               pos.n = ps.n;
               pos.e = ps.e;
               pos.d = ps.d;
-              pos.accuracy = ps.accuracy;
+              pos.accuracy = (fp32_t) ps.accuracy;
 
               if (!getFix(msg->sys_src, pos))
                 m_task->dispatch(pos);
@@ -311,7 +516,7 @@ namespace DUNE
             case CODE_ANG:
             {
               UsblTools::Angles as;
-              std::memcpy(&as, &msg->data[c_code + 1], sizeof(UsblTools::Angles));
+              Angles::decode(as, msg->data);
 
               IMC::UsblAnglesExtended ang;
               ang.setSource(imc_src);
@@ -325,11 +530,25 @@ namespace DUNE
               m_task->dispatch(ang);
               break;
             }
+
+            case CODE_INV:
+            {
+              UsblTools::Gps gps;
+              gps.lat = m_origin.lat;
+              gps.lon = m_origin.lon;
+              gps.z = m_origin.height;
+
+              Gps::encode(gps, data);
+
+              return true;
+            }
           }
+
+          return false;
         }
 
         //! Consume a USBL configuration message.
-        //! param[in] msg The UsblConfig message with a list of UsblModem messages.
+        //! @param[in] msg The UsblConfig message with a list of UsblModem messages.
         void
         consume(const IMC::UsblConfig* msg)
         {
@@ -345,6 +564,17 @@ namespace DUNE
             cfg.setSourceEntity(m_task->getEntityId());
             m_task->dispatchReply(*msg, cfg);
           }
+        }
+
+        //! Consume a GpsFix message and save system position.
+        //! @param[in] msg GpsFix message.
+        void
+        consume(const IMC::GpsFix* msg)
+        {
+          if (msg->type == IMC::GpsFix::GFT_MANUAL_INPUT)
+            return;
+
+          m_origin = *msg;
         }
 
       private:
@@ -367,6 +597,9 @@ namespace DUNE
           if (m_args->fix)
             data[REQ_START - 1] |= c_mask_fix;
 
+          if (m_args->inverted)
+            data[REQ_START - 1] |= c_mask_inverted;
+
           if (m_args->enabled)
             data[REQ_START - 1] |= c_mask_start;
 
@@ -380,18 +613,17 @@ namespace DUNE
         //! @param[in] pos the position stored into a UsblPositionExtended.
         //! @return true if the fix has been dispatched, false otherwise.
         bool
-        getFix(std::string modem, const IMC::UsblPositionExtended& pos)
+        getFix(const std::string& modem, const IMC::UsblPositionExtended& pos)
         {
-          IMC::MessageList<IMC::UsblModem>::const_iterator itr = m_config.modems.begin();
-          for (; itr < m_config.modems.end(); ++itr)
+          for (const auto& itr : m_config.modems)
           {
-            if ((*itr) == NULL)
+            if (itr == nullptr)
               continue;
 
-            if ((*itr)->name == modem)
+            if (itr->name == modem)
             {
-              IMC::UsblFixExtended fix = toFix(pos, (*itr)->lat, (*itr)->lon, (*itr)->z,
-                                               (IMC::ZUnits)(*itr)->z_units);
+              IMC::UsblFixExtended fix = toFix(pos, itr->lat, itr->lon, itr->z,
+                                               static_cast<IMC::ZUnits>(itr->z_units));
               m_task->dispatch(fix);
               return true;
             }
@@ -400,14 +632,16 @@ namespace DUNE
           return false;
         }
 
+        //! Class arguments.
+        const Arguments* m_args;
         //! True if USBL is on.
         bool m_usbl_alive;
         //! True if waiting reply.
         bool m_wait_reply;
-        //! USBL system.
-        std::string m_usbl_name;
         //! Absolute fix or request relative position.
         bool m_fix;
+        //! Inverted mode flag.
+        bool m_inverted;
         //! Periodicity.
         uint16_t m_period;
         //! USBL configuration.
@@ -416,10 +650,10 @@ namespace DUNE
         Time::Counter<double> m_node_timer;
         //! Communication timeout timer.
         Time::Counter<double> m_comm_timeout_timer;
-        //! Class arguments.
-        const Arguments* m_args;
         //! Pointer to task.
-        Tasks::Task* m_task;
+        Tasks::Task* const m_task;
+        //! Local position
+        IMC::GpsFix m_origin;
       };
 
       //! USBL tools handler ticket.
@@ -430,19 +664,20 @@ namespace DUNE
         //! @param[in] name target's name.
         //! @param[in] fix absolute fix or relative positioning
         //! @param[in] period target's desired periodicity.
-        Target(std::string name, bool fix, uint16_t period):
+        Target(std::string name, bool fix, bool inverted, uint16_t period):
+          m_name(std::move(name)),
+          m_fix(fix),
+          m_inverted(inverted),
+          m_period(period),
           m_comm_errors(0)
         {
-          m_name = name;
-          m_fix = fix;
-          m_period = period;
           m_target_timer.setTop(m_period);
         }
 
         //! Time to track target.
         //! @return true, if timer has overflown.
         bool
-        trigger(void)
+        trigger()
         {
           if (m_target_timer.overflow())
           {
@@ -457,21 +692,20 @@ namespace DUNE
         //! @param[in] name name of target.
         //! @return true if target's name is matched.
         bool
-        compare(std::string name)
+        compare(const std::string& name) const
         {
-          if (m_name == name)
-            return true;
-
-          return false;
+          return m_name == name;
         }
 
         //! Reset variables of target.
-        //! @param[in] return absolute fixes or relative position.
+        //! @param[in] fix return absolute fixes or relative position.
+        //! @param[in] inverted inverted mode flag.
         //! @param[in] period desired periodicity.
         void
-        reset(bool fix, uint16_t period)
+        reset(bool fix, bool inverted, uint16_t period)
         {
           m_fix = fix;
+          m_inverted = inverted;
           m_period = period;
           m_target_timer.setTop(m_period);
           resetErrors();
@@ -480,7 +714,7 @@ namespace DUNE
         //! Get target's name.
         //! @return target's name.
         std::string
-        getName(void)
+        getName() const
         {
           return m_name;
         }
@@ -489,27 +723,77 @@ namespace DUNE
         //! @return true if target's wants absolute fix,
         //! false otherwise.
         bool
-        wantsFix(void)
+        wantsFix() const
         {
           return m_fix;
+        }
+
+        //! Check if target is for inverted mode.
+        //! @return true if target is set as inverted,
+        //! false otherwise.
+        bool
+        isInverted() const
+        {
+          return m_inverted;
         }
 
         //! Check if the target node has failed.
         //! @return true if target has reached threshold, false otherwise.
         bool
-        hasFailed(void)
+        hasFailed()
         {
-          if (++m_comm_errors >= c_max_comm_timeout)
-            return true;
-
-          return false;
+          return ++m_comm_errors >= c_max_comm_timeout;
         }
 
         //! Reset count of errors.
         void
-        resetErrors(void)
+        resetErrors()
         {
           m_comm_errors = 0;
+        }
+        
+        //! Set target's absolute position.
+        //! @param[in] msg GpsFix message of target's position.
+        void
+        setOrigin(const IMC::GpsFix* msg)
+        {
+          m_origin = *msg;
+          m_origin_timer.setTop(c_origin_timeout);
+        }
+
+        //! Get target's absolute position.
+        //! @param[out] msg GpsFix message of target's position.
+        //! @return true if message is valid and has been filled, false otherwise.
+        bool
+        getOrigin(IMC::GpsFix& msg)
+        {
+          if (m_origin_timer.overflow())
+            return false;
+
+          msg = m_origin;
+          return true;
+        }
+
+        //! Set target's relative position.
+        //! @param[in] msg UsblPositionExtended message of target's position.
+        void
+        setRelativePosition(const IMC::UsblPositionExtended* msg)
+        {
+          m_rpos = *msg;
+          m_rpos_timer.setTop(c_origin_timeout);
+        }
+
+        //! Get target's relative position.
+        //! @param[out] msg UsblPositionExtended message of target's position.
+        //! @return true if message is valid and has been filled, false otherwise.
+        bool
+        getRelativePosition(IMC::UsblPositionExtended& msg)
+        {
+          if (m_rpos_timer.overflow())
+            return false;
+
+          msg = m_rpos;
+          return true;
         }
 
       private:
@@ -517,12 +801,22 @@ namespace DUNE
         std::string m_name;
         //! Absolute or relative fix.
         bool m_fix;
+        //! Inverted mode.
+        bool m_inverted;
         //! Periodicity.
         uint16_t m_period;
         //! Number of communication errors
         uint8_t m_comm_errors;
         //! Target's desired period timer.
         Time::Counter<double> m_target_timer;
+        //! Target's absolute position timer.
+        Time::Counter<double> m_origin_timer;
+        //! Target's absolute position.
+        IMC::GpsFix m_origin;
+        //! Target's relative position timer.
+        Time::Counter<double> m_rpos_timer;
+        //! Target's relative position.
+        IMC::UsblPositionExtended m_rpos;
       };
 
       //! USBL tools handler.
@@ -530,22 +824,17 @@ namespace DUNE
       {
       public:
         //! Constructor.
-        Modem(void)
+        Modem(Tasks::Task* const task):
+          m_task(task)
         { }
 
         //! This function verifies if we are waiting for the target's reply.
         //! @param[in] name name of the target.
         //! @return true if we are waiting, false otherwise.
         bool
-        waitingForSystem(std::string name)
+        waitingForSystem(const std::string& name) const
         {
-          if (m_system.empty())
-            return false;
-
-          if (name == m_system)
-            return true;
-
-          return false;
+          return !m_system.empty() && name == m_system;
         }
 
         //! Trigger through all targets.
@@ -568,14 +857,13 @@ namespace DUNE
           }
 
           // Iterate and call triggers.
-          std::vector<Target>::iterator itr = m_list.begin();
-          for (; itr != m_list.end(); ++itr)
+          for (auto& target : m_list)
           {
-            if (itr->trigger())
+            if (target.trigger())
             {
               // we'll track this system
-              m_system = itr->getName();
-              name = itr->getName();
+              m_system = target.getName();
+              name = target.getName();
 
               // reset timer.
               m_modem_wdog.setTop(time);
@@ -590,15 +878,13 @@ namespace DUNE
         //! @return true if target wants an absolute fix,
         //! false if it wants a relative position.
         bool
-        wantsFix(std::string name)
+        wantsFix(const std::string& name) const
         {
-          // Iterate through list and add if necessary.
-          std::vector<Target>::iterator itr = m_list.begin();
-          for (; itr != m_list.end(); ++itr)
+          for (const auto& target : m_list)
           {
             // Same target
-            if (itr->compare(name))
-              return itr->wantsFix();
+            if (target.compare(name))
+              return target.wantsFix();
           }
 
           // default is relative positioning to be
@@ -606,12 +892,34 @@ namespace DUNE
           return false;
         }
 
+        //! Get if target's is set for inverted mode.
+        //! @return true if target wants an absolute fix,
+        //! false if it wants a relative position.
+        bool
+        isInverted(const std::string& name, std::vector<uint8_t>& data) const
+        {
+          // Iterate through list.
+          for (const auto& target : m_list)
+          {
+            // Same target
+            if (target.compare(name) && target.isInverted())
+            {
+              data.push_back(CODE_INV);
+              return true;
+            }
+          }
+
+          // default is non inverted.
+          return false;
+        }
+
         //! Parse incoming frame.
+        //! @param[in] imc_src IMC id of message source.
         //! @param[in] msg received acoustic frame.
         //! @param[out] data frame to be send.
         //! @return true if there's data to be sent, false otherwise.
         bool
-        parse(const IMC::UamRxFrame* msg, std::vector<uint8_t>& data)
+        parse(uint16_t imc_src, const IMC::UamRxFrame* msg, std::vector<uint8_t>& data)
         {
           if ((uint8_t)msg->data[c_code] == CODE_REQ)
           {
@@ -632,7 +940,8 @@ namespace DUNE
               }
 
               bool fix = msg->data[REQ_START] & c_mask_fix;
-              add(msg->sys_src, fix, period);
+              bool inverted = msg->data[REQ_START] & c_mask_inverted;
+              add(msg->sys_src, fix, inverted, period);
             }
             else
             {
@@ -645,6 +954,97 @@ namespace DUNE
             std::memcpy(&data[0], &msg->data[1], c_fsize_req);
             data[c_code - 1] = CODE_RPL;
             return true;
+          }
+          else if ((uint8_t)msg->data[c_code] == CODE_ORG)
+          {
+            // Check if we are targeting this system
+            if (msg->sys_src != m_system)
+              return false;
+
+            // Get absolute origin of message
+            IMC::GpsFix origin;
+            origin.setSource(imc_src);
+            Gps::decode(origin, msg->data);
+
+            if (!Modem::consume(&origin))
+              return false;
+
+            IMC::UsblFixExtended fix;
+            if (invertedFix(m_system, fix))
+              m_task->dispatch(fix);
+
+            // Target replyed to ping
+            targetReplied(m_system);
+            m_system.clear();
+          }
+
+          return false;
+        }
+
+        //! Set target's relative position.
+        //! @param[in] msg UsblPositionExtended message of target's position.
+        //! @return true if position set, false otherwise.
+        bool
+        consume(const IMC::UsblPositionExtended* msg)
+        {
+          // Iterate through list and set relative position if required.
+          for (auto& target : m_list)
+          {
+            // Same target
+            if (target.compare(msg->target))
+            {
+              target.setRelativePosition(msg);
+              return true;
+            }
+          }
+
+          return false;
+        }
+
+        //! Set target's absolute position.
+        //! @param[in] msg GpsFix message of target's position.
+        //! @return true if position set, false otherwise.
+        bool
+        consume(const IMC::GpsFix* msg)
+        {
+          // Iterate through list and set origin if required.
+          for (auto& target : m_list)
+          {
+            // Same target
+            if (target.compare(m_system))
+            {
+              target.setOrigin(msg);
+              return true;
+            }
+          }
+
+          return false;
+        }
+        
+        //! Compute absolute fix of system from absolute and relative positions of target
+        //! @param[in] name Target's name.
+        //! @param[out] fix self fix message.
+        //! @return true if able to compute fix and fill message, false otherwise.
+        bool
+        invertedFix(const std::string& name, IMC::UsblFixExtended& fix)
+        {
+          // Iterate through list and compute absolute fix
+          for (auto& target : m_list)
+          {
+            // Same target
+            if (target.compare(name))
+            {
+              IMC::GpsFix gps;
+              IMC::UsblPositionExtended rpos;
+
+              //! Check timeout
+              if (!target.getOrigin(gps) || !target.getRelativePosition(rpos))
+                return false;
+
+              fix = UsblTools::toFix(rpos, gps, true);
+              fix.target = m_task->getSystemName();
+              return true;
+            }
           }
 
           return false;
@@ -663,8 +1063,6 @@ namespace DUNE
           if (m_system != msg->target)
             return false;
 
-          data.resize(sizeof(UsblTools::Fix) + 2);
-
           UsblTools::Fix fix;
           fix.lat = msg->lat;
           fix.lon = msg->lon;
@@ -672,8 +1070,7 @@ namespace DUNE
           fix.z_units = msg->z_units;
           fix.accuracy = msg->accuracy;
 
-          data[c_code - 1] = CODE_FIX;
-          std::memcpy(&data[c_code], &fix, sizeof(UsblTools::Fix));
+          Fix::encode(fix, data);
           targetReplied(m_system);
           m_system.clear();
 
@@ -693,8 +1090,6 @@ namespace DUNE
           if (m_system != msg->target)
             return false;
 
-          data.resize(sizeof(UsblTools::Position) + 2);
-
           UsblTools::Position pos;
           pos.x = msg->x;
           pos.y = msg->y;
@@ -702,10 +1097,12 @@ namespace DUNE
           pos.n = msg->n;
           pos.e = msg->e;
           pos.d = msg->d;
-          pos.accuracy = msg->accuracy;
+          if (msg->accuracy > 255)
+            pos.accuracy = 255;
+          else
+            pos.accuracy = (uint8_t) msg->accuracy;
 
-          data[c_code - 1] = CODE_POS;
-          std::memcpy(&data[c_code], &pos, sizeof(UsblTools::Position));
+          Position::encode(pos, data);
           targetReplied(m_system);
           m_system.clear();
 
@@ -726,8 +1123,6 @@ namespace DUNE
           if (m_system != msg->target)
             return false;
 
-          data.resize(sizeof(UsblTools::Angles) + 2);
-
           UsblTools::Angles ang;
           ang.lbearing = msg->lbearing;
           ang.lelevation = msg->lelevation;
@@ -735,8 +1130,7 @@ namespace DUNE
           ang.elevation = msg->elevation;
           ang.accuracy = msg->accuracy;
 
-          data[c_code - 1] = CODE_ANG;
-          std::memcpy(&data[c_code], &ang, sizeof(UsblTools::Angles));
+          Angles::encode(ang, data);
           m_system.clear();
 
           return true;
@@ -748,30 +1142,29 @@ namespace DUNE
         //! @param[in] fix absolute fix or relative positioning
         //! @param[in] period target's desired periodicity.
         void
-        add(std::string name, bool fix, uint16_t period)
+        add(const std::string& name, bool fix, bool inverted, uint16_t period)
         {
           // Iterate through list and add if necessary.
-          std::vector<Target>::iterator itr = m_list.begin();
-          for (; itr != m_list.end(); ++itr)
+          for (auto& target : m_list)
           {
             // Same target
-            if (itr->compare(name))
+            if (target.compare(name))
             {
-              itr->reset(fix, period);
+              target.reset(fix, inverted, period);
               return;
             }
           }
 
-          m_list.push_back(Target(name, fix, period));
+          m_list.emplace_back(name, fix, inverted, period);
         }
 
         //! Remove target.
         //! @param[in] target target's name.
         void
-        remove(std::string name)
+        remove(const std::string& name)
         {
           // Iterate through list and remove target.
-          std::vector<Target>::iterator itr = m_list.begin();
+          auto itr = m_list.begin();
           for (; itr != m_list.end(); ++itr)
           {
             // Erase target from list.
@@ -785,7 +1178,7 @@ namespace DUNE
 
         //! Clear current list of targets.
         void
-        clear(void)
+        clear()
         {
           m_list.clear();
         }
@@ -793,16 +1186,15 @@ namespace DUNE
         //! Target is alive and replying.
         //! @param[in] name target's name.
         void
-        targetReplied(std::string name)
+        targetReplied(const std::string& name)
         {
-          // Iterate through list and remove if necessary.
-          std::vector<Target>::iterator itr = m_list.begin();
-          for (; itr != m_list.end(); ++itr)
+          // Iterate through list and reset any errors.
+          for (auto& target : m_list)
           {
             // Same target
-            if (itr->compare(name))
+            if (target.compare(name))
             {
-              itr->resetErrors();
+              target.resetErrors();
               return;
             }
           }
@@ -811,10 +1203,10 @@ namespace DUNE
         //! Target failed to reply.
         //! @param[in] name target's name.
         void
-        targetFailed(std::string name)
+        targetFailed(const std::string& name)
         {
           // Iterate through list and remove if necessary.
-          std::vector<Target>::iterator itr = m_list.begin();
+          auto itr = m_list.begin();
           for (; itr != m_list.end(); ++itr)
           {
             // Same target
@@ -836,6 +1228,54 @@ namespace DUNE
         std::string m_system;
         //! Maximum amount of time waiting for system's reply.
         Time::Counter<double> m_modem_wdog;
+        //! Pointer to task.
+        Tasks::Task* const m_task;
+      };
+
+      //! USBL position filter.
+      class Filter
+      {
+      public:
+        //! Constructor.
+        Filter(unsigned avg_samples, double k_std):
+          m_avg_range(avg_samples),
+          m_k_std(k_std)
+        { }
+
+        //! Set last received state
+        void
+        consume(const IMC::EstimatedState* msg)
+        {
+          m_last_state = *msg;
+        }
+
+        //! Set last received USBL fix
+        //! @return true if position passes filter, false otherwise.
+        bool
+        consume(const IMC::UsblFixExtended* msg)
+        {
+          double lat, lon;
+          double range, bearing;
+          Coordinates::toWGS84(m_last_state, lat, lon);
+          Coordinates::WGS84::getNEBearingAndRange(lat, lon,
+                                                  msg->lat, msg->lon,
+                                                  &range, &bearing);
+
+          double mean_range = m_avg_range.update(range);
+          double std_range = m_avg_range.stdev();
+
+          double diff_to_mean = std::abs(range - mean_range);
+
+          return diff_to_mean <= m_k_std * std_range;
+        }
+
+      private:
+        //! Moving average of distance between estimated state and USBL Fix
+        Math::MovingAverage<double> m_avg_range;
+        //! Standard deviation multiplication factor to issue error.
+        double m_k_std;
+        //! Last received estimated state
+        IMC::EstimatedState m_last_state;
       };
     };
   }

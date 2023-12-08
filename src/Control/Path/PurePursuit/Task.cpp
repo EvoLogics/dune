@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -66,6 +66,13 @@ namespace Control
         {
           // Activate heading controller.
           enableControlLoops(IMC::CL_YAW);
+        }
+
+        void
+        onPathDeactivation(void)
+        {
+          // Deactivate heading controller.
+          disableControlLoops(IMC::CL_YAW);
         }
 
         void

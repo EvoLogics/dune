@@ -1,5 +1,5 @@
 ############################################################################
-# Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      #
+# Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      #
 # Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  #
 ############################################################################
 # This file is part of DUNE: Unified Navigation Environment.               #
@@ -75,7 +75,10 @@ if(DUNE_VERSION_TPL AND DUNE_VERSION_OUT)
 else()
   set(DUNE_CORE_SOURCES ${DUNE_CORE_SOURCES}
     ${DUNE_GENERATED}/src/DUNE/Version.cpp)
-  file(WRITE "${DUNE_GENERATED}/src/DUNE/Version.cpp" "")
+    
+  if(NOT EXISTS "${DUNE_GENERATED}/src/DUNE/Version.cpp")
+    file(WRITE "${DUNE_GENERATED}/src/DUNE/Version.cpp" "")
+  endif()
 
   add_custom_target(dune-version
     COMMAND ${CMAKE_COMMAND}

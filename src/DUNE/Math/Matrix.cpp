@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -46,6 +46,7 @@
 
 // DUNE headers.
 #include <DUNE/Utils/String.hpp>
+#include <DUNE/Math/Constants.hpp>
 #include <DUNE/Math/Matrix.hpp>
 #include <DUNE/Math/General.hpp>
 #include <DUNE/Parsers/Config.hpp>
@@ -117,7 +118,7 @@ namespace DUNE
       }
     }
 
-    Matrix::Matrix(double* data, size_t r, size_t c)
+    Matrix::Matrix(const double* data, size_t r, size_t c)
     {
       if (!r || !c)
         throw Error("Invalid dimension!");
@@ -150,7 +151,7 @@ namespace DUNE
       identity();
     }
 
-    Matrix::Matrix(double* diag, size_t n)
+    Matrix::Matrix(const double* diag, size_t n)
     {
       m_nrows = n;
       m_ncols = n;
@@ -203,6 +204,42 @@ namespace DUNE
       m_data = newdata;
       m_counter = m_data + m_size;
       *m_counter = 1;
+    }
+
+    double*
+    Matrix::begin(void)
+    {
+      return m_data;
+    }
+
+    double*
+    Matrix::end(void)
+    {
+      return m_data + m_size;
+    }
+
+    const double*
+    Matrix::begin(void) const
+    {
+      return m_data;
+    }
+
+    const double*
+    Matrix::end(void) const
+    {
+      return m_data + m_size;
+    }
+
+    const double*
+    Matrix::cbegin(void) const
+    {
+      return m_data;
+    }
+
+    const double*
+    Matrix::cend(void) const
+    {
+      return m_data + m_size;
     }
 
     int
@@ -517,7 +554,7 @@ namespace DUNE
     void
     Matrix::swapRows(size_t i, size_t j)
     {
-      if (i >= m_ncols || j >= m_ncols)
+      if (i >= m_nrows || j >= m_nrows)
         throw Error("Invalid index!");
 
       if (i == j)
@@ -846,7 +883,7 @@ namespace DUNE
     }
 
     Matrix
-    Matrix::operator-(void)
+    Matrix::operator-(void) const
     {
       if (isEmpty())
         throw Error("Trying to access an empty matrix!");
@@ -1203,7 +1240,11 @@ namespace DUNE
         double cy = std::cos(ea[2] / 2);
         double sy = std::sin(ea[2] / 2);
 
-        double q[4] = {cr* cp * cy + sr * sp * sy, sr * cp * cy - cr * sp * sy, cr * sp * cy + sr * cp * sy, cr * cp * sy - sr * sp * cy};
+        double q[4] = {cr * cp * cy + sr * sp * sy,
+                       sr * cp * cy - cr * sp * sy,
+                       cr * sp * cy + sr * cp * sy,
+                       cr * cp * sy - sr * sp * cy};
+
         return Matrix(q, 4, 1);
       }
 
@@ -1247,17 +1288,26 @@ namespace DUNE
         return Matrix(ea, 3, 1);
       }
 
-      // quaternion to Euler angles
+      // Quaternion to Euler angles
       if (m_nrows == 4 && m_ncols == 1)
       {
-        double q[4] = {element(0, 0), element(1, 0), element(2, 0), element(3, 0)};
+        double norm = norm_p(2);
+        double q[4] = {element(0, 0) / norm,
+                       element(1, 0) / norm,
+                       element(2, 0) / norm,
+                       element(3, 0) / norm};
 
-        double ea[3] =
-        {
-          std::atan2(2 * (q[2] * q[3] - q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2])),
-          std::asin(2 * (q[1] * q[3] - q[0] * q[2])),
-          std::atan2(2 * (q[1] * q[2] - q[0] * q[3]), 1 - 2 * (q[2] * q[2] + q[3] * q[3]))
-        };
+        double roll = std::atan2(2 * (q[0] * q[1] + q[2] * q[3]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
+
+        double pitch = 2 * (q[0] * q[2] - q[3] * q[1]);
+        if (std::fabs(pitch) >= 1)
+          pitch = c_half_pi * pitch / std::fabs(pitch);
+        else
+          pitch = std::asin(pitch);
+
+        double yaw =  std::atan2(2 * (q[0] * q[3] + q[1] * q[2]), 1 - 2 * (q[2] * q[2] + q[3] * q[3]));
+
+        double ea[3] = { roll, pitch, yaw };
 
         return Matrix(ea, 3, 1);
       }
@@ -1924,7 +1974,7 @@ namespace DUNE
     }
 
     Matrix
-    skew(double data[3])
+    skew(const double data[3])
     {
       Matrix m(3, 3, 0.0);
       m(0, 1) = -data[2];

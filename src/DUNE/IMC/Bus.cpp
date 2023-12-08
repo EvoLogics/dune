@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -85,9 +85,9 @@ namespace DUNE
       bind->setTimeStamp();
       bind->consumer = task->getName();
       bind->message_id = id;
-      m_bind_msgs.push_back(bind);
 
       Concurrency::ScopedRWLock l(m_lock, true);
+      m_bind_msgs.push_back(bind);
       TransportList::iterator itr = std::find(m_recipients[id].begin(), m_recipients[id].end(), task);
       if (itr == m_recipients[id].end())
         m_recipients[id].push_back(task);
@@ -143,6 +143,7 @@ namespace DUNE
     const std::vector<TransportBindings*>
     Bus::getBindings(void)
     {
+      Concurrency::ScopedRWLock l(m_lock);
       return m_bind_msgs;
     }
   }

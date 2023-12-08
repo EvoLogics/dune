@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2017 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -39,13 +39,17 @@ namespace DUNE
 
 #include <DUNE/Math/Constants.hpp>
 #include <DUNE/Math/Derivative.hpp>
+#include <DUNE/Math/EulerAnglesZyx.hpp>
 #include <DUNE/Math/General.hpp>
 #include <DUNE/Math/Matrix.hpp>
 #include <DUNE/Math/Angles.hpp>
 #include <DUNE/Math/Random.hpp>
 #include <DUNE/Math/Optimization.hpp>
 #include <DUNE/Math/QPSolver.hpp>
+#include <DUNE/Math/Quaternion.hpp>
 #include <DUNE/Math/MovingAverage.hpp>
 #include <DUNE/Math/MultiMovingAverage.hpp>
+#include <DUNE/Math/Grid.hpp>
+#include <DUNE/Math/FIRFilter.hpp>
 
 #endif
