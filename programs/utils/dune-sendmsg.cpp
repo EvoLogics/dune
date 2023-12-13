@@ -49,7 +49,7 @@ main(int argc, char** argv)
     if (argc == 2 && (!strcmp(argv[1], "-l") || !strcmp(argv[1], "--list")))
     {
       fprintf(stdout, "Available Messages:\n");
-      fprintf(stdout, "  [A]: Abort, AcousticMessage, AcousticOperation, AcousticSystemsQuery\n");
+      fprintf(stdout, "  [A]: Abort, AcousticMessage, AcousticOperation, AcousticSystemsQuery, Announce\n");
       fprintf(stdout, "  [B]: Brake, ButtonEvent\n");
       fprintf(stdout, "  [C]: CacheControl, Calibration, ClockControl, ControlLoops\n");
       fprintf(stdout, "  [D]: DataSanity, DesiredControl, DesiredHeading, DesiredHeadingRate, DesiredPitch,\n");
@@ -131,6 +131,14 @@ main(int argc, char** argv)
   {
     IMC::AcousticSystemsQuery* tmsg = new IMC::AcousticSystemsQuery;
     msg = tmsg;
+  }
+
+  if (strcmp(argv[3], "Announce") == 0)
+  {
+    IMC::Announce* tmsg = new IMC::Announce;
+    msg = tmsg;
+    tmsg->sys_name = argv[4];
+    tmsg->services = argv[5];
   }
 
   if (strcmp(argv[3], "Brake") == 0)
