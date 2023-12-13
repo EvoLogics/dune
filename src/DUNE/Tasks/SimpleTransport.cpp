@@ -118,7 +118,10 @@ namespace DUNE
           dispatch(m, DF_KEEP_TIME | DF_KEEP_SRC_EID);
 
           if (m_gargs.trace_in)
-            inf(DTR("incoming: %s"), m->getName());
+          {
+            trace("received a message of %db", n);
+            m->toText(std::cerr);
+          }
 
           delete m;
         }
