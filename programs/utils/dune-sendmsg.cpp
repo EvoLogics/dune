@@ -84,20 +84,24 @@ main(int argc, char** argv)
   }
 
   Address dest(argv[1]);
-
-  // Parse port.
   unsigned port = 0;
-  if (!castLexical(argv[2], port))
+
+  if (dest != Address::Any)
   {
-    fprintf(stderr, "ERROR: invalid port '%s'\n", argv[2]);
-    return 1;
+    // Parse port.
+    if (!castLexical(argv[2], port))
+    {
+      fprintf(stderr, "ERROR: invalid port '%s'\n", argv[2]);
+      return 1;
+    }
+
+    if (port > 65535)
+    {
+      fprintf(stderr, "ERROR: invalid port '%s'\n", argv[2]);
+      return 1;
+    }
   }
 
-  if (port > 65535)
-  {
-    fprintf(stderr, "ERROR: invalid port '%s'\n", argv[2]);
-    return 1;
-  }
 
   IMC::Message* msg = NULL;
 
@@ -856,23 +860,32 @@ main(int argc, char** argv)
   uint8_t bfr[1024] = {0};
   uint16_t rv = IMC::Packet::serialize(msg, bfr, sizeof(bfr));
 
-  UDPSocket sock;
-  try
+  if (dest != Address::Any)
   {
-    sock.write(bfr, rv, dest, port);
+    UDPSocket sock;
+    try
+    {
+      sock.write(bfr, rv, dest, port);
 
-    fprintf(stderr, "Raw:");
-    for (int i = 0; i < rv; ++i)
-      fprintf(stderr, " %02X", bfr[i]);
-    fprintf(stderr, "\n");
+      fprintf(stderr, "Raw:");
+      for (int i = 0; i < rv; ++i)
+        fprintf(stderr, " %02X", bfr[i]);
+      fprintf(stderr, "\n");
 
-    msg->toText(cerr);
+      msg->toText(cerr);
+    }
+    catch (std::runtime_error& e)
+    {
+      std::cerr << "ERROR: " << e.what() << std::endl;
+      return 1;
+    }
   }
-  catch (std::runtime_error& e)
+  else
   {
-    std::cerr << "ERROR: " << e.what() << std::endl;
-    return 1;
+    fprintf(stderr, "Destination host is omitted or incorrect, writing raw data to stdout\n");
+    fwrite(bfr, sizeof(uint8_t), rv, stdout);
   }
+
 
   if (msg != NULL)
   {
