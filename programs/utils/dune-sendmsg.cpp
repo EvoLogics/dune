@@ -801,8 +801,13 @@ main(int argc, char** argv)
   {
     IMC::TriggerAction* tmsg = new IMC::TriggerAction;
     msg = tmsg;
-    tmsg->event = atoi(argv[4]);
-    tmsg->act_id = atoi(argv[5]);
+    if (argc >= 6)
+    {
+      tmsg->event = atoi(argv[4]);
+      tmsg->act_id = atoi(argv[5]);
+    }
+    if (argc >= 7)
+      tmsg->custom = argv[6];
   }
 
   if (strcmp(argv[3], "UASimulation") == 0)
