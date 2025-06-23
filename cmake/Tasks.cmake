@@ -1,5 +1,5 @@
 ############################################################################
-# Copyright 2007-2023 Universidade do Porto - Faculdade de Engenharia      #
+# Copyright 2007-2015 Universidade do Porto - Faculdade de Engenharia      #
 # Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  #
 ############################################################################
 # This file is part of DUNE: Unified Navigation Environment.               #
@@ -8,20 +8,18 @@
 # Licencees holding valid commercial DUNE licences may use this file in    #
 # accordance with the commercial licence agreement provided with the       #
 # Software or, alternatively, in accordance with the terms contained in a  #
-# written agreement between you and Faculdade de Engenharia da             #
-# Universidade do Porto. For licensing terms, conditions, and further      #
-# information contact lsts@fe.up.pt.                                       #
+# written agreement between you and Universidade do Porto. For licensing   #
+# terms, conditions, and further information contact lsts@fe.up.pt.        #
 #                                                                          #
-# Modified European Union Public Licence - EUPL v.1.1 Usage                #
-# Alternatively, this file may be used under the terms of the Modified     #
-# EUPL, Version 1.1 only (the "Licence"), appearing in the file LICENCE.md #
+# European Union Public Licence - EUPL v.1.1 Usage                         #
+# Alternatively, this file may be used under the terms of the EUPL,        #
+# Version 1.1 only (the "Licence"), appearing in the file LICENCE.md       #
 # included in the packaging of this file. You may not use this work        #
 # except in compliance with the Licence. Unless required by applicable     #
 # law or agreed to in writing, software distributed under the Licence is   #
 # distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF     #
 # ANY KIND, either express or implied. See the Licence for the specific    #
 # language governing permissions and limitations at                        #
-# https://github.com/LSTS/dune/blob/master/LICENCE.md and                  #
 # http://ec.europa.eu/idabc/eupl.html.                                     #
 ############################################################################
 # Author: Ricardo Martins                                                  #
@@ -40,6 +38,7 @@ macro(dune_add_task root_folder task)
   set(TASK_HEADERS)
   set(TASK_PROGRAM)
   set(TASK_NOT_STRICT)
+  set(TASK_EXTRA_CXX_FLAGS)
 
   macro(task_files_hook)
   endmacro(task_files_hook)
@@ -69,90 +68,106 @@ macro(dune_add_task root_folder task)
   set(TASK_NAME_MANGLED ${TASK_NAME_MANGLED}${TASK_NAME})
   set(cxx_flags "-DDUNE_TASK=\"DUNE_TASK_EXPORT(${TASK_CLASS_PATH}::Task, ${TASK_NAME_MANGLED})\"")
 
-  # Get required dependencies.
-  set(deps_met 1)
+  list(FIND DISABLED_TASKS ${TASK_LABEL} IDX)
 
-  if(TASK_REQUIRES)
-    string(TOUPPER ${TASK_REQUIRES} deps)
-    string(REPLACE "-" "_" deps ${deps})
-    string(REPLACE " " "" deps ${deps})
-    string(REPLACE "," ";" deps ${deps})
+  if(${IDX} EQUAL -1)
+    # Get required dependencies.
+    set(deps_met 1)
 
-    foreach(dep ${deps})
-      if(NOT "${DUNE_USING_${dep}}" EQUAL 1)
-        set(deps_met 0)
-      endif(NOT "${DUNE_USING_${dep}}" EQUAL 1)
-      set(cxx_flags "${cxx_flags} -DDUNE_${dep}_REQUIRED")
-    endforeach(dep ${deps})
-  endif(TASK_REQUIRES)
+    if(TASK_REQUIRES)
+      string(TOUPPER ${TASK_REQUIRES} deps)
+      string(REPLACE "-" "_" deps ${deps})
+      string(REPLACE " " "" deps ${deps})
+      string(REPLACE "," ";" deps ${deps})
 
-  if(deps_met AND TASK_ENABLED)
-    set(DUNE_TASKS_ENABLED ${DUNE_TASKS_ENABLED} ${TASK_LABEL})
+      foreach(dep ${deps})
+        if(NOT "${DUNE_USING_${dep}}" EQUAL 1)
+          set(deps_met 0)
+        endif(NOT "${DUNE_USING_${dep}}" EQUAL 1)
+        set(cxx_flags "${cxx_flags} -DDUNE_${dep}_REQUIRED")
+      endforeach(dep ${deps})
+    endif(TASK_REQUIRES)
 
-    task_files_hook()
+    if(deps_met AND TASK_ENABLED)
+      set(DUNE_TASKS_ENABLED ${DUNE_TASKS_ENABLED} ${TASK_LABEL})
 
-    if(TASK_NOT_STRICT)
-      set(cxx_flags "${cxx_flags} ${DUNE_CXX_FLAGS}")
-    else(TASK_NOT_STRICT)
-      set(cxx_flags "${cxx_flags} ${DUNE_CXX_FLAGS} ${DUNE_CXX_FLAGS_STRICT}")
-    endif(TASK_NOT_STRICT)
+      task_files_hook()
 
-    if(NOT TASK_SOURCES)
-      file(GLOB TASK_SOURCES ${root_folder}/${path}/*.cpp)
-    endif(NOT TASK_SOURCES)
+      if(TASK_NOT_STRICT)
+        set(cxx_flags "${cxx_flags} ${DUNE_CXX_FLAGS}")
+      else(TASK_NOT_STRICT)
+        set(cxx_flags "${cxx_flags} ${DUNE_CXX_FLAGS} ${DUNE_CXX_FLAGS_STRICT}")
+      endif(TASK_NOT_STRICT)
 
-    if(NOT TASK_HEADERS)
-      file(GLOB TASK_HEADERS ${root_folder}/${path}/*.hpp)
-    endif(NOT TASK_HEADERS)
+      set(cxx_flags "${cxx_flags} ${TASK_EXTRA_CXX_FLAGS}")
 
-    if(TASK_PROGRAM)
-      foreach(task_main_source ${TASK_PROGRAM})
-        set(program)
-        list(REMOVE_ITEM TASK_SOURCES ${task_main_source})
-        list(REMOVE_ITEM TASK_SOURCES ${PROJECT_SOURCE_DIR}/${task_main_source})
+      if(NOT TASK_SOURCES)
+        file(GLOB TASK_SOURCES ${root_folder}/${path}/*.cpp)
+      endif(NOT TASK_SOURCES)
 
-        get_filename_component(program ${task_main_source} NAME_WE)
-        add_executable(${program} EXCLUDE_FROM_ALL ${TASK_SOURCES} ${TASK_HEADERS} ${task_main_source})
-        target_link_libraries(${program} dune-core ${DUNE_SYS_LIBS} ${DUNE_EXTERNAL_LIBS})
-        set_source_files_properties(${task_main_source} PROPERTIES COMPILE_FLAGS "${cxx_flags}")
-      endforeach(task_main_source ${TASK_PROGRAM})
-    endif(TASK_PROGRAM)
+      if(NOT TASK_HEADERS)
+        file(GLOB TASK_HEADERS ${root_folder}/${path}/*.hpp)
+      endif(NOT TASK_HEADERS)
 
-    set_source_files_properties(${TASK_SOURCES}
-      PROPERTIES COMPILE_FLAGS "${cxx_flags}")
+      if(TASK_PROGRAM)
+        foreach(task_main_source ${TASK_PROGRAM})
+          set(program)
+          list(REMOVE_ITEM TASK_SOURCES ${task_main_source})
+          list(REMOVE_ITEM TASK_SOURCES ${PROJECT_SOURCE_DIR}/${task_main_source})
 
-    if(DUNE_STATIC)
-      add_library(${TASK_LABEL} STATIC ${TASK_SOURCES})
-      target_link_libraries(${TASK_LABEL} dune-core ${DUNE_SYS_LIBS})
-      if(DUNE_CXX_MICROSOFT AND DUNE_CPU_X86)
-        if(DUNE_CPU_32B)
-          set_target_properties(${TASK_LABEL} PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x86")
-        else(DUNE_CPU_32B)
-          set_target_properties(${TASK_LABEL} PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x64")
-        endif(DUNE_CPU_32B)
-      endif(DUNE_CXX_MICROSOFT AND DUNE_CPU_X86)
-      set(creator_sign "DUNE::Tasks::Task* create${TASK_NAME_MANGLED}(const std::string&, DUNE::Tasks::Context&);\n")
-      set(creator_init "DUNE::Tasks::Factory::registerStaticTask(\"${TASK_LABEL}\", create${TASK_NAME_MANGLED});\n")
-      set(STATIC_TASKS_SIGNATURES "${STATIC_TASKS_SIGNATURES}${creator_sign}")
-      set(STATIC_TASKS_CREATORS "${STATIC_TASKS_CREATORS}${creator_init}")
-      set(DUNE_STATIC_TASKS "${DUNE_STATIC_TASKS};${TASK_LABEL}")
-    endif(DUNE_STATIC)
+          get_filename_component(program ${task_main_source} NAME_WE)
+          add_executable(${program} EXCLUDE_FROM_ALL ${TASK_SOURCES} ${TASK_HEADERS} ${task_main_source})
+          target_link_libraries(${program} dune-core ${DUNE_SYS_LIBS} ${DUNE_EXTERNAL_LIBS})
+          set_source_files_properties(${task_main_source} PROPERTIES COMPILE_FLAGS "${cxx_flags}")
+        endforeach(task_main_source ${TASK_PROGRAM})
+      endif(TASK_PROGRAM)
 
-    if(DUNE_SHARED)
-      add_library(${TASK_LABEL} MODULE ${TASK_SOURCES})
-      target_link_libraries(${TASK_LABEL} dune-core ${DUNE_SYS_LIBS})
-      set_target_properties(${TASK_LABEL} PROPERTIES PREFIX "")
-      set_target_properties(${TASK_LABEL} PROPERTIES SUFFIX ".ddt")
-      install(TARGETS ${TASK_LABEL} RUNTIME DESTINATION lib LIBRARY DESTINATION lib)
-    endif(DUNE_SHARED)
+      set_source_files_properties(${TASK_SOURCES}
+        PROPERTIES COMPILE_FLAGS "${cxx_flags}")
 
-  else(deps_met AND TASK_ENABLED)
+      if(DUNE_STATIC)
+        add_library(${TASK_LABEL} STATIC ${TASK_SOURCES})
+        target_link_libraries(${TASK_LABEL} dune-core ${DUNE_SYS_LIBS})
+        if(DUNE_CXX_MICROSOFT AND DUNE_CPU_X86)
+          if(DUNE_CPU_32B)
+            set_target_properties(${TASK_LABEL} PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x86")
+          else(DUNE_CPU_32B)
+            set_target_properties(${TASK_LABEL} PROPERTIES STATIC_LIBRARY_FLAGS "/machine:x64")
+          endif(DUNE_CPU_32B)
+        endif(DUNE_CXX_MICROSOFT AND DUNE_CPU_X86)
+        set(creator_sign "DUNE::Tasks::Task* create${TASK_NAME_MANGLED}(const std::string&, DUNE::Tasks::Context&);\n")
+        set(creator_init "DUNE::Tasks::Factory::registerStaticTask(\"${TASK_LABEL}\", create${TASK_NAME_MANGLED});\n")
+        set(STATIC_TASKS_SIGNATURES "${STATIC_TASKS_SIGNATURES}${creator_sign}")
+        set(STATIC_TASKS_CREATORS "${STATIC_TASKS_CREATORS}${creator_init}")
+        set(DUNE_STATIC_TASKS "${DUNE_STATIC_TASKS};${TASK_LABEL}")
+      endif(DUNE_STATIC)
+
+      if(DUNE_SHARED)
+        add_library(${TASK_LABEL} MODULE ${TASK_SOURCES})
+        target_link_libraries(${TASK_LABEL} dune-core ${DUNE_SYS_LIBS})
+        set_target_properties(${TASK_LABEL} PROPERTIES PREFIX "")
+        set_target_properties(${TASK_LABEL} PROPERTIES SUFFIX ".ddt")
+        install(TARGETS ${TASK_LABEL} RUNTIME DESTINATION lib LIBRARY DESTINATION lib)
+      endif(DUNE_SHARED)
+
+    else(deps_met AND TASK_ENABLED)
+      set(DUNE_TASKS_DISABLED ${DUNE_TASKS_DISABLED} ${TASK_LABEL})
+    endif(deps_met AND TASK_ENABLED)
+  else(${IDX} EQUAL -1)
     set(DUNE_TASKS_DISABLED ${DUNE_TASKS_DISABLED} ${TASK_LABEL})
-  endif(deps_met AND TASK_ENABLED)
+  endif(${IDX} EQUAL -1)
 endmacro(dune_add_task root_folder task)
 
 macro(dune_add_tasks root_folder)
-  file(GLOB_RECURSE tasks RELATIVE ${root_folder} ${root_folder}/Task.cmake)
+  set (tasks "Sensors/WIC/Task.cmake"
+             "Transports/Announce/Task.cmake"
+             "Transports/Discovery/Task.cmake"
+             "Transports/Logging/Task.cmake"
+             "Transports/SimpleProxy/Task.cmake"
+             "Transports/TCP/Client/Task.cmake"
+             "Transports/HTTP/Task.cmake"
+             "Transports/UDP/Task.cmake"
+             )
   foreach(task ${tasks})
     dune_add_task(${root_folder} ${task})
   endforeach(task ${tasks})
@@ -171,16 +186,6 @@ if(TASK_FILE)
   endif()
 else(TASK_FILE)
   dune_add_tasks(${PROJECT_SOURCE_DIR}/src)
-  # Adding private folders.
-  file(GLOB privdir ${PROJECT_SOURCE_DIR}/private*/)
-  foreach(privdir ${privdir})
-    dune_add_tasks(${privdir}/src)
-  endforeach(privdir ${privdir})
-  # Adding user folders.
-  file(GLOB userdir ${PROJECT_SOURCE_DIR}/user*/)
-  foreach(userdir ${userdir})
-    dune_add_tasks(${userdir}/src)
-  endforeach(userdir ${userdir})
 endif(TASK_FILE)
 
 list(SORT DUNE_TASKS_ENABLED)
