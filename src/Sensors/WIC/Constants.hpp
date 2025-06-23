@@ -68,7 +68,7 @@ namespace Sensors
     constexpr int c_pipeline_stream_payloader_config_interval {1};
 
     //! Path (relative to DUNE etc/ folder) to the directory containing the color palette files.
-    const FileSystem::Path c_color_palette_dir {"evologics/sonobot-v5/payload/wic/color-palettes"};
+    const FileSystem::Path c_color_palette_dir {"testing/color-palettes"};
     //! File extension of Workswell palette files.
     const std::string c_palette_file_ext {"plt"};
     //! Name of the default palette.
