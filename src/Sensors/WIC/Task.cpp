@@ -55,19 +55,6 @@ namespace Sensors
       PIPELINE_TIMEOUT,
     };
 
-    //! Enum containing the IDs for IMC::TriggerAction.
-    enum TriggerActionID
-    {
-      //! Force Task restart (useful to reset to a known state).
-      FORCE_TASK_RESTART = 0U,
-      //! Force Task restart (useful to reset to a known state).
-      FORCE_PIPELINE_RESTART = 1U,
-      //! Take a picture of the current frame and save as JPEG.
-      TAKE_PICTURE = 2U,
-      //! Print out the WIC camera information and settings to terminal (useful for debugging).
-      PRINT_CAM_INFO = 3U,
-    };
-
     //! Task arguments.
     struct Arguments
     {
@@ -310,7 +297,6 @@ namespace Sensors
         .visibility(Tasks::Parameter::VISIBILITY_USER);
 
         bind<IMC::LoggingControl>(this);
-        bind<IMC::TriggerAction>(this);
       }
 
       void
@@ -395,24 +381,6 @@ namespace Sensors
           default:
             break;
         }
-      }
-
-      void
-      consume(const IMC::TriggerAction* msg)
-      {
-        if (msg->getDestination() != getSystemId() ||
-            msg->getDestinationEntity() != getEntityId() ||
-            msg->event != IMC::TriggerAction::TAE_REQUEST)
-          return;
-
-        if (msg->act_id == TriggerActionID::FORCE_TASK_RESTART)
-          throw RestartNeeded("restart requested by TriggerAction", c_restart_delay);
-        if (msg->act_id == TriggerActionID::FORCE_PIPELINE_RESTART)
-          m_restart_pipeline = true;
-        if (msg->act_id == TriggerActionID::TAKE_PICTURE)
-          m_take_picture = true;
-        if (msg->act_id == TriggerActionID::PRINT_CAM_INFO)
-          m_camera_if.printCameraInformation();
       }
 
       void
