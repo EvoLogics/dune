@@ -160,8 +160,6 @@ endmacro(dune_add_task root_folder task)
 
 macro(dune_add_tasks root_folder)
   set (tasks "Sensors/WIC/Task.cmake"
-             "Transports/Announce/Task.cmake"
-             "Transports/Discovery/Task.cmake"
              "Transports/Logging/Task.cmake"
              "Transports/TCP/Client/Task.cmake"
              "Transports/HTTP/Task.cmake"
