@@ -35,7 +35,8 @@ if(OPENCV)
     set(DUNE_SYS_HAS_OPENCV 1 CACHE INTERNAL "OpenCV library")
     set(DUNE_USING_OPENCV 1 CACHE INTERNAL "OpenCV library")
 
-    # FIND_PACKAGE(OpenCV REQUIRED)
+    find_package(Threads REQUIRED)
+    find_package(OpenCV REQUIRED)
     dune_add_lib(opencv_calib3d)
     dune_add_lib(opencv_core)
     dune_add_lib(opencv_features2d)
@@ -56,12 +57,12 @@ if(OPENCV)
     #dune_add_lib(opencv_legacy)
 
     # Check Header
-    dune_test_header(opencv2/opencv.hpp)
-    
-    dune_test_header(opencv2/imgcodecs.hpp)
-    if(DUNE_SYS_HAS_OPENCV2_IMGCODECS_HPP)
-      dune_add_lib(opencv_imgcodecs)
-    endif(DUNE_SYS_HAS_OPENCV2_IMGCODECS_HPP)
+    dune_test_header(opencv4/opencv2/opencv.hpp)
+
+    # dune_test_header(opencv2/imgcodecs.hpp)
+    # if(DUNE_SYS_HAS_OPENCV2_IMGCODECS_HPP)
+    #   dune_add_lib(opencv_imgcodecs)
+    # endif(DUNE_SYS_HAS_OPENCV2_IMGCODECS_HPP)
 
   else(HAVE_LIB_OPENCV)
     # OpenCV not found on the system.
