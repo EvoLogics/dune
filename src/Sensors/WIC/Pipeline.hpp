@@ -27,11 +27,11 @@
 #ifndef SENSORS_WIC_PIPELINE_HPP_INCLUDED_
 #define SENSORS_WIC_PIPELINE_HPP_INCLUDED_
 
+// C++ STL headers.
+#include <string>
+
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
-
-// ISO C++ 11 headers.
-#include <string>
 
 // Library headers.
 #include <glib.h>
@@ -39,8 +39,8 @@
 #include <gst/app/gstappsrc.h>
 
 // Local headers.
-#include "Bin.hpp"
-#include "Utils.hpp"
+#include "Constants.hpp"
+#include "GstWrappers.hpp"
 
 namespace Sensors
 {
@@ -48,7 +48,7 @@ namespace Sensors
   {
     using DUNE_NAMESPACES;
 
-    enum PipelineState : uint8_t
+    enum PipelineState
     {
       NOT_PLAYING,
       PLAYING,
@@ -59,9 +59,10 @@ namespace Sensors
     {
       bool use_hw_encoding;
       bool record_to_file;
-      int source_frame_width;
-      int source_frame_height;
-      int source_framerate;
+      int frame_width;
+      int frame_height;
+      int src_framerate;
+      int stream_framerate;
       std::string udp_destination;
     };
 
@@ -69,7 +70,6 @@ namespace Sensors
     {
     public:
       Pipeline(Tasks::Task* parent):
-        m_record_file_counter {0U},
         m_parent {parent}
       {
       }
@@ -90,40 +90,43 @@ namespace Sensors
       updateSettings(const PipelineSettings& settings)
       {
         if (settings.use_hw_encoding != m_settings.use_hw_encoding)
-          m_parent->inf("set hw encoding to '%s'", settings.use_hw_encoding ? "true" : "false"); 
+          m_parent->inf("%s", settings.use_hw_encoding ? "using hardware encoding" : "using software encoding");
         if (settings.record_to_file != m_settings.record_to_file)
-          m_parent->inf("set record to file to '%s'", settings.record_to_file ? "true" : "false");
-        if (settings.source_frame_width != m_settings.source_frame_width)
-          m_parent->inf("set source frame width to %d", settings.source_frame_width);
-        if (settings.source_frame_height != m_settings.source_frame_height)
-          m_parent->inf("set source frame height to %d", settings.source_frame_height);
-        if (settings.source_framerate != m_settings.source_framerate)
-          m_parent->inf("set source framerate to %d", settings.source_framerate);
+          m_parent->inf("%s", settings.record_to_file ? "recording enabled" : "recording disabled");
+        if (settings.frame_width != m_settings.frame_width)
+          m_parent->inf("set source frame width to: %d px", settings.frame_width);
+        if (settings.frame_height != m_settings.frame_height)
+          m_parent->inf("set source frame height to: %d px", settings.frame_height);
+        if (settings.src_framerate != m_settings.src_framerate)
+          m_parent->inf("set source framerate to: %d FPS", settings.src_framerate);
+        if (settings.stream_framerate != m_settings.stream_framerate)
+          m_parent->inf("set stream framerate to: %d FPS", settings.stream_framerate);
         if (settings.udp_destination != m_settings.udp_destination)
-          m_parent->inf("set UDP destination to %s", settings.udp_destination.c_str());
+          m_parent->inf("set UDP destination to: %s", settings.udp_destination.c_str());
 
         m_settings = settings;
       }
 
-      void
-      setSaveLocation(const Path& save_location)
+      FileSystem::Path
+      recordDirectory() const
       {
-        if (save_location != m_save_location)
-        {
-          m_parent->inf("set save location to %s", save_location.str().c_str());
-          m_save_location = save_location;
-          m_record_file_counter = 0U;
-        }
+        return m_record_directory;
+      }
+
+      void
+      setRecordDirectory(const FileSystem::Path& record_directory)
+      {
+        m_record_directory = record_directory;
       }
 
       std::string
-      error()
+      error() const
       {
         return m_error;
       }
 
       PipelineState
-      state()
+      state() const
       {
         if (!m_error.empty())
           return PipelineState::ERROR;
@@ -132,10 +135,31 @@ namespace Sensors
         return (GST_STATE(m_pipeline) == GST_STATE_PLAYING) ? PipelineState::PLAYING : PipelineState::NOT_PLAYING;
       }
 
-      Path
-      saveLocation()
+      PipelineSettings
+      settings() const
       {
-        return m_save_location;
+        return m_settings;
+      }
+
+      bool
+      create()
+      {
+        m_parent->debug("creating pipeline");
+
+        if (!createPipelineAndBus())
+          return false;
+        if (!createSource())
+          return false;
+        if (!createTee())
+          return false;
+        if (!createBins())
+          return false;
+        if (!addElementsToPipeline())
+          return false;
+        if (!linkPipeline())
+          return false;
+
+        return true;
       }
 
       void
@@ -143,89 +167,28 @@ namespace Sensors
       {
         if (m_pipeline != nullptr)
         {
-          spew("unreferencing pipeline");
+          m_parent->debug("unreferencing pipeline");
           gst_object_unref(m_pipeline);
           m_pipeline = nullptr;
         }
         if (m_bus != nullptr)
         {
-          spew("unreferencing bus");
+          m_parent->debug("unreferencing bus");
           gst_object_unref(m_bus);
           m_bus = nullptr;
         }
       }
 
       bool
-      createAndStart()
-      {
-        if (!create())
-          return false;
-        if (!start())
-          return false;
-        return true;
-      }
-
-      bool
-      create()
-      {
-        spew("creating pipeline");
-
-        if (m_settings.record_to_file && m_save_location.type() == Path::Type::PT_INVALID)
-        {
-          m_error = "failed to create pipeline: invalid save location: '" + m_save_location.str() + "'";
-          return false;
-        }
-
-        spew("initializing pipeline and bus objects");
-        m_pipeline = gst_pipeline_new("pipeline");
-        m_bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
-
-        spew("selecting bins");
-        selectBinsBasedOnConfig();
-
-        if (m_source_bin == nullptr || m_record_bin == nullptr || m_stream_bin == nullptr)
-        {
-          m_error = "not all bins are defined - something went wrong during bin selection";
-          return false;
-        }
-
-        spew("creating appsrc");
-        if (!createAppsrcAndAddToPipeline())
-          return false;
-
-        spew("creating bins");
-        if (!createBinAndAddToPipeline(m_source_bin) ||
-            !createBinAndAddToPipeline(m_record_bin) ||
-            !createBinAndAddToPipeline(m_stream_bin))
-          return false;
-
-        spew("creating tee");
-        if (!createTeeAndAddToPipeline())
-          return false;
-
-        spew("linking pipeline");
-        if (!linkPipeline())
-          return false;
-
-        resetError();
-        return true;
-      }
-
-      bool
       start()
       {
-        spew("starting pipeline");
-        if (!readyToStart())
-        {
-          m_error = "not all elements were created!";
+        m_parent->debug("starting pipeline");
+
+        if (!checkReadyToStart())
           return false;
-        }
-        if (!gst_element_set_state(m_pipeline, GST_STATE_PLAYING))
-        {
-          m_error = "failed to start the pipeline";
+        if (!setPipelinePlaying())
           return false;
-        }
-        resetError();
+
         return true;
       }
 
@@ -235,13 +198,11 @@ namespace Sensors
         if (m_pipeline == nullptr)
           return true;
 
-        spew("stopping the pipeline");
-        if (!gst_element_set_state(m_pipeline, GST_STATE_NULL))
-        {
-          m_error = "failed to stop the pipeline";
+        m_parent->debug("stopping pipeline");
+
+        if (!setPipelineStopping())
           return false;
-        }
-        resetError();
+
         return true;
       }
 
@@ -262,7 +223,8 @@ namespace Sensors
         GstBuffer* buffer;
         GstFlowReturn ret;
 
-        const size_t data_size = m_settings.source_frame_width * m_settings.source_frame_height * 2U; 
+        constexpr size_t bytes_per_pixel = 3U; // RGB
+        const size_t data_size = m_settings.frame_width * m_settings.frame_height * bytes_per_pixel;
 
         buffer = gst_buffer_new_allocate(nullptr, data_size, nullptr);
         if (buffer == nullptr)
@@ -272,11 +234,11 @@ namespace Sensors
         if (num_filled != data_size)
           return;
 
-        sample = gst_sample_new(buffer, m_appsrc->m_source_caps, nullptr, nullptr);
+        sample = gst_sample_new(buffer, m_appsrc->sourceCaps(), nullptr, nullptr);
         if (sample == nullptr)
           return;
 
-        ret = gst_app_src_push_sample(GST_APP_SRC_CAST(m_appsrc->m_element), sample);
+        ret = gst_app_src_push_sample(GST_APP_SRC_CAST(m_appsrc->element()), sample);
         if (ret != GST_FLOW_OK)
           return;
 
@@ -286,152 +248,146 @@ namespace Sensors
 
     private:
       bool
-      readyToStart()
+      createPipelineAndBus()
       {
-        return (m_pipeline != nullptr) &&
-               (m_bus != nullptr) &&
-               (m_source_bin != nullptr) &&
-               (m_record_bin != nullptr) &&
-               (m_stream_bin != nullptr);
-      }
+        m_pipeline = gst_pipeline_new("pipeline");
+        m_bus = gst_pipeline_get_bus(GST_PIPELINE(m_pipeline));
 
-      void
-      selectBinsBasedOnConfig()
-      {
-        if (m_settings.use_hw_encoding)
+        if (m_pipeline == nullptr || m_bus == nullptr)
         {
-          m_source_bin = new SourceBinHWEnc(m_settings.source_frame_width,
-                                            m_settings.source_frame_height,
-                                            m_settings.source_framerate);
-          if (m_settings.record_to_file)
-            m_record_bin = new RecordBinHWEncoding(m_settings.source_framerate, currentRecordingFilename());
-          else
-            m_record_bin = new RecordBinFakesink();
-          m_stream_bin = new StreamBinHWEncoding(m_settings.source_framerate, m_settings.udp_destination);
-        }
-        else
-        {
-          m_source_bin = new SourceBinSWEnc();
-          if (m_settings.record_to_file)
-            m_record_bin = new RecordBinSWEncoding(currentRecordingFilename());
-          else
-            m_record_bin = new RecordBinFakesink();
-          m_stream_bin = new StreamBinSWEncoding(m_settings.udp_destination);
-        }
-      }
-
-      std::string
-      currentRecordingFilename()
-      {
-        m_record_file_counter += 1U;
-        return (m_save_location/String::str("wic-recording-%lu.avi", m_record_file_counter)).str();
-      }
-
-      bool
-      createAppsrcAndAddToPipeline()
-      {
-        spew("creating appsrc element & caps");
-        GstElement* appsrc_element = gst_element_factory_make("appsrc", "source");
-        GstCaps* appsrc_caps = gst_caps_new_simple("video/x-raw",
-                                                   "format", G_TYPE_STRING, "GRAY16_BE",
-                                                   "width", G_TYPE_INT, m_settings.source_frame_width,
-                                                   "height", G_TYPE_INT, m_settings.source_frame_height,
-                                                   "framerate", GST_TYPE_FRACTION, m_settings.source_framerate, 1,
-                                                   nullptr);
-
-        if (appsrc_element == nullptr)
-        {
-          m_error = "failed to create appsrc element";
+          m_error = "failed to create gstreamer pipeline and/or bus";
           return false;
         }
 
-        spew("assigning appsrc element & caps");
-        m_appsrc = new Element(appsrc_element, appsrc_caps);
-
-        spew("setting appsrc properties");
-        g_object_set(m_appsrc->m_element,
-                     "stream-type", 0,
-                     "format", GST_FORMAT_TIME,
-                     "is-live", true,
-                     "do-timestamp", true,
-                     nullptr);
-
-        spew("adding appsrc to pipeline");
-        if (!gst_bin_add(GST_BIN(m_pipeline), m_appsrc->m_element))
-        {
-          m_error = "failed to add appsrc to pipeline";
-          return false;
-        }
-
-        resetError();
         return true;
       }
 
       bool
-      createTeeAndAddToPipeline()
+      createSource()
       {
-        m_tee = gst_element_factory_make("tee", "tee");
-        if (m_tee == nullptr)
+        m_appsrc = new GstElementWrapper {"source", "appsrc"};
+        m_appsrc->setSourceCaps(String::str("video/x-raw, format=RGB, width=%d, height=%d, framerate=%d/1",
+                                            m_settings.frame_width,
+                                            m_settings.frame_height,
+                                            m_settings.src_framerate));
+        m_appsrc->setProperty("stream-type", 0);
+        m_appsrc->setProperty("format", GST_FORMAT_TIME);
+        m_appsrc->setProperty("is-live", true);
+        m_appsrc->setProperty("do-timestamp", true);
+
+        if (!m_appsrc->valid())
+        {
+          m_error = "failed to create appsrc element";
+          return false;
+        }
+        return true;
+      }
+
+      bool
+      createTee()
+      {
+        m_tee = new GstElementWrapper {"tee", "tee"};
+
+        if (!m_tee->valid())
         {
           m_error = "failed to create tee element";
           return false;
         }
 
-        if (!gst_bin_add(GST_BIN(m_pipeline), m_tee))
+        return true;
+      }
+
+      void
+      selectBins()
+      {
+        if (m_settings.use_hw_encoding)
         {
-          m_error = "failed to add tee to pipeline";
+          m_source_bin = new SourceBinHWEnc(m_settings.frame_width, m_settings.frame_height, m_settings.src_framerate);
+          m_stream_bin = new StreamBinHWEncoding(m_settings.src_framerate,
+                                                 m_settings.stream_framerate,
+                                                 m_settings.udp_destination);
+        }
+        else
+        {
+          m_source_bin = new SourceBinSWEnc();
+          m_stream_bin = new StreamBinSWEncoding(m_settings.stream_framerate, m_settings.udp_destination);
+        }
+
+        if (m_settings.record_to_file)
+        {
+          if (m_settings.use_hw_encoding)
+            m_record_bin = new RecordBinHWEncoding(createRecordingFilepath());
+          else
+            m_record_bin = new RecordBinSWEncoding(createRecordingFilepath());
+        }
+        else
+        {
+          m_record_bin = new RecordBinFakesink();
+        }
+      }
+
+      bool
+      createBins()
+      {
+        selectBins();
+
+        if (!m_source_bin->create())
+        {
+          m_error = m_source_bin->error();
           return false;
         }
 
-        resetError();
+        if (!m_stream_bin->create())
+        {
+          m_error = m_stream_bin->error();
+          return false;
+        }
+
+        if (!m_record_bin->create())
+        {
+          m_error = m_record_bin->error();
+          return false;
+        }
+
         return true;
       }
 
       bool
-      createBinAndAddToPipeline(Bin* bin)
+      addElementsToPipeline()
       {
-        spew(String::str("creating bin '%s'", bin->name().c_str()));
-        if (!bin->create())
-        {
-          m_error = bin->lastError();
-          return false;
-        }
-        spew(String::str("created bin '%s'", bin->name().c_str()));
+        bool success {true};
 
-        spew(String::str("adding bin '%s' to pipeline", bin->name().c_str()));
-        if (!gst_bin_add(GST_BIN(m_pipeline), bin->bin()))
-        {
-          m_error = String::str("failed to add bin %s to pipeline", GST_ELEMENT_NAME(bin->bin()));
-          return false;
-        }
-        spew(String::str("added bin '%s' to pipeline", bin->name().c_str()));
+        success &= gst_bin_add(GST_BIN(m_pipeline), m_appsrc->element());
+        success &= gst_bin_add(GST_BIN(m_pipeline), m_source_bin->element());
+        success &= gst_bin_add(GST_BIN(m_pipeline), m_tee->element());
+        success &= gst_bin_add(GST_BIN(m_pipeline), m_stream_bin->element());
+        success &= gst_bin_add(GST_BIN(m_pipeline), m_record_bin->element());
 
-        resetError();
-        return true;
+        if (!success)
+          m_error = "failed to add all elements to the pipeline";
+
+        return success;
       }
 
       bool
       linkPipeline()
       {
-        spew(String::str("linking appsrc with bin '%s'", m_source_bin->name().c_str()));
-        if (!gst_element_link_filtered(m_appsrc->m_element, m_source_bin->bin(), m_appsrc->m_source_caps))
+        if (!gst_element_link_filtered(m_appsrc->element(), m_source_bin->element(), m_appsrc->sourceCaps()))
         {
           m_error = "failed to link appsrc to bin '" + m_source_bin->name();
           return false;
         }
 
-        spew(String::str("linking bin '%s' with tee", m_source_bin->name().c_str()));
-        if (!gst_element_link(m_source_bin->bin(), m_tee))
+        if (!gst_element_link(m_source_bin->element(), m_tee->element()))
         {
           m_error = "failed to link bin '" + m_source_bin->name() + "' with tee";
           return false;
         }
 
-        spew("linking tee pads");
-        GstPad* tee_pad_1 = gst_element_get_request_pad(m_tee, "src_%u");
-        GstPad* tee_pad_2 = gst_element_get_request_pad(m_tee, "src_%u");
-        GstPad* record_pad = gst_element_get_static_pad(m_record_bin->bin(), "sink");
-        GstPad* stream_pad = gst_element_get_static_pad(m_stream_bin->bin(), "sink");
+        GstPad* tee_pad_1 = gst_element_get_request_pad(m_tee->element(), "src_%u");
+        GstPad* tee_pad_2 = gst_element_get_request_pad(m_tee->element(), "src_%u");
+        GstPad* record_pad = gst_element_get_static_pad(m_record_bin->element(), "sink");
+        GstPad* stream_pad = gst_element_get_static_pad(m_stream_bin->element(), "sink");
         if (gst_pad_link(tee_pad_1, record_pad) != GST_PAD_LINK_OK ||
             gst_pad_link(tee_pad_2, stream_pad) != GST_PAD_LINK_OK)
         {
@@ -439,15 +395,69 @@ namespace Sensors
           return false;
         }
 
-        resetError();
         return true;
+      }
+
+      bool
+      checkReadyToStart()
+      {
+        bool ready = (m_pipeline != nullptr) &&
+                     (m_bus != nullptr) &&
+                     (m_appsrc != nullptr) &&
+                     (m_source_bin != nullptr) &&
+                     (m_record_bin != nullptr) &&
+                     (m_stream_bin != nullptr) &&
+                     (m_tee != nullptr);
+        if (!ready)
+          m_error = "pipeline not ready to start!";
+
+        return ready;
+      }
+
+      bool
+      setPipelinePlaying()
+      {
+        if (!gst_element_set_state(m_pipeline, GST_STATE_PLAYING))
+        {
+          m_error = "failed to start the pipeline";
+          return false;
+        }
+
+        return true;
+      }
+
+      bool
+      setPipelineStopping()
+      {
+        if (!gst_element_set_state(m_pipeline, GST_STATE_NULL))
+        {
+          m_error = "failed to stop the pipeline";
+          return false;
+        }
+
+        return true;
+      }
+
+      std::string
+      createRecordingFilepath()
+      {
+        std::string filename = "wic-recording-"
+                               + Time::Format::getDateSafe()
+                               + "-"
+                               + Time::Format::getTimeSafe()
+                               + ".avi";
+        std::string filepath = (m_record_directory / filename).str();
+        m_parent->inf("recording video to file: %s", filepath.c_str());
+        return filepath;
       }
 
       void
       treatBusMsg()
       {
-        GstMessage* msg = gst_bus_pop_filtered(m_bus,
-          GstMessageType(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING | GST_MESSAGE_STATE_CHANGED | GST_MESSAGE_EOS));
+        GstMessage* msg = gst_bus_pop_filtered(
+          m_bus,
+          GstMessageType(GST_MESSAGE_ERROR | GST_MESSAGE_WARNING | GST_MESSAGE_STATE_CHANGED | GST_MESSAGE_EOS)
+        );
 
         if (msg == nullptr)
           return;
@@ -460,7 +470,7 @@ namespace Sensors
             gchar* debug;
             gst_message_parse_error(msg, &err, &debug);
             m_parent->err("Gstreamer error: %s: %s", GST_OBJECT_NAME(msg->src), err->message);
-            spew(String::str("debug information: %s", debug));
+            m_parent->debug("debug information: %s", debug);
             g_error_free(err);
             g_free(debug);
             break;
@@ -471,7 +481,7 @@ namespace Sensors
             gchar* debug;
             gst_message_parse_warning(msg, &err, &debug);
             m_parent->war("Gstreamer warning: %s: %s", GST_OBJECT_NAME(msg->src), err->message);
-            spew(String::str("debug information: %s", debug));
+            m_parent->debug("debug information: %s", debug);
             g_error_free(err);
             g_free(debug);
             break;
@@ -480,15 +490,17 @@ namespace Sensors
           {
             GstState old_state, new_state;
             gst_message_parse_state_changed (msg, &old_state, &new_state, nullptr);
-            spew(String::str("element state change: %-25s %s -> %s",
+            m_parent->debug("element state change: %-25s %s -> %s",
                              GST_OBJECT_NAME(msg->src),
                              gst_element_state_get_name(old_state),
-                             gst_element_state_get_name(new_state)));
+                             gst_element_state_get_name(new_state));
             break;
           }
           case GST_MESSAGE_EOS:
-            spew("Gstreamer end-of-stream received");
+          {
+            m_parent->debug("received Gstreamer end-of-stream (EOS)");
             break;
+          }
           default:
             break;
         }
@@ -496,31 +508,18 @@ namespace Sensors
         gst_message_unref(msg);
       }
 
-      void
-      resetError()
-      {
-        m_error.clear();
-      }
-
-      void
-      spew(const std::string& msg)
-      {
-        m_parent->spew("[%-8s] %s", "Pipeline", msg.c_str());
-      }
-
       // Elements & Bins
       GstBus* m_bus;
       GstElement* m_pipeline;
-      GstElement* m_tee;
-      Element* m_appsrc;
-      Bin* m_source_bin;
-      Bin* m_record_bin;
-      Bin* m_stream_bin;
+      GstElementWrapper* m_tee;
+      GstElementWrapper* m_appsrc;
+      GstBinWrapper* m_source_bin;
+      GstBinWrapper* m_record_bin;
+      GstBinWrapper* m_stream_bin;
 
       //! Params & Properties
       PipelineSettings m_settings;
-      Path m_save_location;
-      size_t m_record_file_counter;
+      FileSystem::Path m_record_directory;
 
       //! Other
       std::string m_error;

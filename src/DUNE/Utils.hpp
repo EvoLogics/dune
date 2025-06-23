@@ -50,4 +50,5 @@ namespace DUNE
 #include <DUNE/Utils/XML.hpp>
 #include <DUNE/Utils/Codecs.hpp>
 #include <DUNE/Utils/LogCollector.hpp>
+#include <DUNE/Utils/ErrorAggregator.hpp>
 #endif

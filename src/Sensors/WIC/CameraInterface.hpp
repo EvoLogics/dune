@@ -27,13 +27,14 @@
 #ifndef SENSORS_WIC_CAMERA_INTERFACE_HPP_INCLUDED_
 #define SENSORS_WIC_CAMERA_INTERFACE_HPP_INCLUDED_
 
-// DUNE headers.
-#include <DUNE/DUNE.hpp>
-
-// ISO C++ 11 headers.
+// C++ STL headers.
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
+
+// DUNE headers.
+#include <DUNE/DUNE.hpp>
 
 // Library headers.
 #include <Camera.h>
@@ -42,7 +43,6 @@
 
 // Local headers.
 #include "Constants.hpp"
-#include "Utils.hpp"
 
 namespace Sensors
 {
@@ -50,18 +50,155 @@ namespace Sensors
   {
     using DUNE_NAMESPACES;
 
+    // Convenience typedef.
+    typedef CameraSerialSettings CSS;
+
+    // Struct holding the camera settings.
     struct CameraSettings
     {
-      CSS::RangeModes range;
-      CSS::FFCModes ffc;
-      CSS::DigitalOutputDepth dod;
-      CSS::Palettes palette;
-      uint16_t brightness;
-      CSS::AGCTypes agc;
-      CSS::VideoColorModes vcm;
+      //! Whether or not to invert the image horizontally.
       bool invert_hor;
+      //! Whether or not to invert the image vertically.
       bool invert_ver;
+      //! The scene emissivity (used by camera for temperature calculations) (range: 0.5 - 1.0).
+      double emissivity;
+      //! The humidity (used by camera for temperature calculations) (range: 0.0 - 1.0).
+      double humidity;
+      //! The scene atmospheric temperature (used by camera for temperature calculations).
+      double atmospheric_temperature;
+      //! The scene reflected temperature (used by camera for temperature calculations).
+      double reflected_temperature;
     };
+
+    inline std::string
+    toStr(const CSS::CameraSpeed fps)
+    {
+      switch (fps)
+      {
+        case CSS::CameraSpeed::_9Hz:
+          return "9 Hz";
+        case CSS::CameraSpeed::_30Hz:
+          return "30 Hz";
+        case CSS::CameraSpeed::_60Hz:
+          return "60 Hz";
+        default:
+          return "(unrecognized value)";
+      }
+    }
+
+    inline int
+    toInt(const CSS::CameraSpeed fps)
+    {
+      switch (fps)
+      {
+        case CSS::CameraSpeed::_9Hz:
+          return 9;
+        case CSS::CameraSpeed::_30Hz:
+          return 30;
+        case CSS::CameraSpeed::_60Hz:
+          return 60;
+        default:
+          return 0;
+      }
+    }
+
+    inline std::string
+    toStr(const CSS::DigitalOutputModes dom)
+    {
+      switch (dom)
+      {
+        case CSS::DigitalOutputModes::NONE:
+          return "None";
+        case CSS::DigitalOutputModes::XPMode:
+          return "XP Mode";
+        case CSS::DigitalOutputModes::LVDSMode:
+          return "LVDS Mode";
+        case CSS::DigitalOutputModes::CMOSBitDepth:
+          return "CMOS Bit Depth";
+        case CSS::DigitalOutputModes::LVDSBitDepth:
+          return "LVDS Bit Depth";
+        default:
+          return "(unrecognized value)";
+      }
+    }
+
+    inline std::string
+    toStr(const CSS::RangeModes range)
+    {
+      switch (range)
+      {
+        case CSS::RangeModes::Low:
+          return "Low";
+        case CSS::RangeModes::Middle:
+          return "Middle";
+        case CSS::RangeModes::High:
+          return "High";
+        default:
+          return "(unrecognized value)";
+      }
+    }
+
+    inline std::string
+    toStr(const CSS::FFCModes ffc)
+    {
+      switch (ffc)
+      {
+        case CSS::FFCModes::Manual:
+          return "Manual";
+        case CSS::FFCModes::Auto:
+          return "Auto";
+        case CSS::FFCModes::External:
+          return "External";
+        default:
+          return "(unrecognized value)";
+      }
+    }
+
+    inline std::string
+    toStr(const CSS::XPBusModes xp)
+    {
+      switch (xp)
+      {
+        case CSS::XPBusModes::Disabled:
+          return "Disabled";
+        case CSS::XPBusModes::BT656:
+          return "BT656";
+        case CSS::XPBusModes::CMOS:
+          return "CMOS";
+        default:
+          return "(unrecognized value)";
+      }
+    }
+
+    inline std::string
+    toStr(const CSS::DigitalOutputDepth dod)
+    {
+      switch (dod)
+      {
+        case CSS::DigitalOutputDepth::Bits8b:
+          return "8 Bit Grayscale";
+        case CSS::DigitalOutputDepth::Bit8bBayer:
+          return "8 Bit Bayer";
+        case CSS::DigitalOutputDepth::Bits14b:
+          return "14 Bit Raw";
+        case CSS::DigitalOutputDepth::Bit16bYCbCr:
+          return "16 Bit YCbCr";
+        default:
+          return "(unrecognized value)";
+      }
+    }
+
+    inline std::string
+    toStr(const bool value)
+    {
+      return value ? "true" : "false";
+    }
+
+    inline std::string
+    toStr(const double value)
+    {
+      return String::str("%.3f", value);
+    }
 
     class CameraInterface
     {
@@ -71,6 +208,11 @@ namespace Sensors
         m_has_data {true},
         m_parent {parent}
       {
+      }
+
+      ~CameraInterface()
+      {
+        deallocate();
       }
 
       std::string
@@ -86,13 +228,11 @@ namespace Sensors
       }
 
       bool
-      connect(std::string& camera_license_file_folder)
+      connect(std::string& camera_license_file_dir)
       {
-        spew("connecting to camera");
-
         if (m_camera == nullptr)
         {
-          if (!findCamera(camera_license_file_folder))
+          if (!findCamera(camera_license_file_dir))
           {
             m_error = "no camera found";
             return false;
@@ -118,8 +258,6 @@ namespace Sensors
       bool
       disconnect()
       {
-        spew("disconnecting from camera");
-
         if (m_camera != nullptr)
         {
           m_camera->Disconnect();
@@ -137,8 +275,6 @@ namespace Sensors
       bool
       startImageAcquisition()
       {
-        spew("starting image acquisition");
-
         m_camera->StartAcquisition();
 
         if (!m_camera->IsAcquiring())
@@ -156,11 +292,9 @@ namespace Sensors
       {
         if (m_camera == nullptr)
         {
-          spew("camera not connected - not stopping image acquisition");
+          m_parent->debug("camera not connected - not stopping image acquisition");
           return true;
         }
-
-        spew("stopping image acquisition");
 
         m_camera->StopAcquisition();
 
@@ -174,88 +308,78 @@ namespace Sensors
         return true;
       }
 
+      double
+      tempConversionSlope()
+      {
+        return m_temp_conversion_slope;
+      }
+
+      double
+      tempConversionOffset()
+      {
+        return m_temp_conversion_offset;
+      }
+
       bool
       updateSettings(const CameraSettings& settings)
       {
         if (m_camera == nullptr)
         {
-          spew("camera not connected - not updating settings");
+          m_parent->debug("camera not connected - not updating settings");
           return true;
         }
 
-        spew("updating camera settings");
-
-        CSS* css = m_camera->GetSettings();
-
         std::vector<std::string> error_msgs;
-
         auto add_to_errors = [&error_msgs](const std::string& param_name, const std::string& value)
         {
           error_msgs.push_back("'" + param_name + "' to '" + value + "'");
         };
 
-        std::function<void(CSS::RangeModes)> range_setter =
-          std::bind(&CSS::SetRangeMode, css, std::placeholders::_1);
-        std::function<CSS::RangeModes(void)> range_getter =
-          std::bind(&CSS::GetRangeMode, css);
-        std::function<void(CSS::FFCModes)> ffc_setter =
-          std::bind(&CSS::SetFFCMode, css, std::placeholders::_1);
-        std::function<CSS::FFCModes(void)> ffc_getter =
-          std::bind(&CSS::GetFFCMode, css);
-        std::function<void(CSS::DigitalOutputDepth)> dod_setter =
-          std::bind(&CSS::SetCMOSBitDepth, css, std::placeholders::_1);
-        std::function<CSS::DigitalOutputDepth(void)> dod_getter =
-          std::bind(&CSS::GetCMOSBitDepth, css);
-        std::function<void(CSS::Palettes)> palette_setter =
-          std::bind(&CSS::SetPalette, css, std::placeholders::_1);
-        std::function<CSS::Palettes(void)> palette_getter =
-          std::bind(&CSS::GetPalette, css);
-        std::function<void(uint16_t)> brightness_setter =
-          std::bind(&CSS::SetBrightness, css, std::placeholders::_1);
-        std::function<uint16_t(void)> brightness_getter =
-          std::bind(&CSS::GetBrightness, css);
-        std::function<void(CSS::AGCTypes)> agc_setter =
-          std::bind(&CSS::SetAGCType, css, std::placeholders::_1);
-        std::function<CSS::AGCTypes(void)> agc_getter =
-          std::bind(&CSS::GetAGCType, css);
-        std::function<void(CSS::VideoColorModes)> vcm_setter =
-          std::bind(&CSS::SetVideoColorMode, css, std::placeholders::_1);
-        std::function<CSS::VideoColorModes(void)> vcm_getter =
-          std::bind(&CSS::GetVideoColorMode, css);
-        std::function<void(bool)> invert_hor_setter =
-          std::bind(&CSS::SetInvertVideo, css, std::placeholders::_1);
-        std::function<bool(void)> invert_hor_getter =
-          std::bind(&CSS::GetInvertVideo, css);
-        std::function<void(bool)> invert_ver_setter =
-          std::bind(&CSS::SetRevertVideo, css, std::placeholders::_1);
-        std::function<bool(void)> invert_ver_getter =
-          std::bind(&CSS::GetRevertVideo, css);
+        CSS* css = m_camera->GetSettings();
+        std::function<void(bool)> invert_hor_setter = std::bind(&CSS::SetRevertVideo, css, std::placeholders::_1);
+        std::function<bool(void)> invert_hor_getter = std::bind(&CSS::GetRevertVideo, css);
+        std::function<void(bool)> invert_ver_setter = std::bind(&CSS::SetInvertVideo, css, std::placeholders::_1);
+        std::function<bool(void)> invert_ver_getter = std::bind(&CSS::GetInvertVideo, css);
+        std::function<void(double)> emissivity_setter = std::bind(&CSS::SetEmissivity, css, std::placeholders::_1);
+        std::function<double(void)> emissivity_getter = std::bind(&CSS::GetEmissivity, css);
+        std::function<void(double)> humidity_setter = std::bind(&CSS::SetHumidity, css, std::placeholders::_1);
+        std::function<double(void)> humidity_getter = std::bind(&CSS::GetHumidity, css);
+        std::function<void(double)> atmospheric_T_setter = std::bind(&CSS::SetAtmospericTemperatureC, css, std::placeholders::_1);
+        std::function<double(void)> atmospheric_T_getter = std::bind(&CSS::GetAtmospericTemperatureC, css);
+        std::function<void(double)> reflected_T_setter = std::bind(&CSS::SetReflectedTemperatureC, css, std::placeholders::_1);
+        std::function<double(void)> reflected_T_getter = std::bind(&CSS::GetReflectedTemperatureC, css);
 
-        if (!updateSetting("range", settings.range, &m_settings.range, range_setter, range_getter))
-          add_to_errors("range", toStr(settings.range));
-        if (!updateSetting("FFC", settings.ffc, &m_settings.ffc, ffc_setter, ffc_getter))
-          add_to_errors("FFC", toStr(settings.ffc));
-        if (!updateSetting("digital output depth", settings.dod, &m_settings.dod, dod_setter, dod_getter))
-          add_to_errors("digital output depth", toStr(settings.dod));
-        if (!updateSetting("palette", settings.palette, &m_settings.palette, palette_setter, palette_getter))
-          add_to_errors("palette", toStr(settings.palette));
-        if (!updateSetting("brightness", settings.brightness, &m_settings.brightness, brightness_setter, brightness_getter))
-          add_to_errors("brightness", toStr(settings.brightness));
-        /* if (!updateSetting("AGC", settings.agc, &m_settings.agc, agc_setter, agc_getter)) */
-        /*   add_to_errors("AGC", toStr(settings.agc)); */
-        if (!updateSetting("video color mode", settings.vcm, &m_settings.vcm, vcm_setter, vcm_getter))
-          add_to_errors("video color mode", toStr(settings.vcm));
-        if (!updateSetting("invert image horizontally", settings.invert_hor, &m_settings.invert_hor, invert_hor_setter, invert_hor_getter))
+        if (!updateSetting("invert image horizontally", settings.invert_hor, m_settings.invert_hor,
+                           invert_hor_setter, invert_hor_getter))
           add_to_errors("invert image horizontally", toStr(settings.invert_hor));
-        if (!updateSetting("invert image vertically", settings.invert_ver, &m_settings.invert_ver, invert_ver_setter, invert_ver_getter))
+        if (!updateSetting("invert image vertically", settings.invert_ver, m_settings.invert_ver,
+                           invert_ver_setter, invert_ver_getter))
           add_to_errors("invert image vertically", toStr(settings.invert_ver));
+        if (!updateSetting("humidity", settings.humidity, m_settings.humidity,
+                           humidity_setter, humidity_getter))
+          add_to_errors("humidity", toStr(settings.humidity));
+        if (!updateSetting("emissivity", settings.emissivity, m_settings.emissivity,
+                           emissivity_setter, emissivity_getter))
+          add_to_errors("emissivity", toStr(settings.emissivity));
+        if (!updateSetting("atmospheric temperature", settings.atmospheric_temperature, m_settings.atmospheric_temperature,
+                           atmospheric_T_setter, atmospheric_T_getter))
+          add_to_errors("atmospheric temperature", toStr(settings.atmospheric_temperature));
+        if (!updateSetting("reflected temperature", settings.reflected_temperature, m_settings.reflected_temperature,
+                           reflected_T_setter, reflected_T_getter))
+          add_to_errors("reflected temperature", toStr(settings.reflected_temperature));
 
         if (error_msgs.size() > 0)
         {
-          m_error = String::str("failed to update following camera settings: %s",
+          m_error = String::str("failed to update camera setting(s): %s",
                                 String::join(error_msgs.begin(), error_msgs.end(), ", ").c_str());
           return false;
         }
+
+        //! Calculate the slope and offset for temperature conversions.
+        const double temp_min {m_camera->CalculateTemperatureC(0U)};
+        const double temp_max {m_camera->CalculateTemperatureC(7000U)};
+        m_temp_conversion_offset = temp_min;
+        m_temp_conversion_slope = (temp_max - temp_min) / 7000U;
 
         resetError();
         return true;
@@ -300,28 +424,13 @@ namespace Sensors
       }
 
       void
-      getCameraSettings()
-      {
-        CSS* css = m_camera->GetSettings();
-        checkCameraSettingsNotNull(css);
-
-        m_settings.agc = css->GetAGCType();
-        m_settings.brightness = css->GetBrightness();
-        m_settings.dod = css->GetCMOSBitDepth();
-        m_settings.ffc = css->GetFFCMode();
-        m_settings.invert_hor = css->GetInvertVideo();
-        m_settings.invert_ver = css->GetRevertVideo();
-        m_settings.palette = css->GetPalette();
-        m_settings.range = css->GetRangeMode();
-        m_settings.vcm = css->GetVideoColorMode();
-      }
-
-      void
       printCameraInformation()
       {
         CSS* css = m_camera->GetSettings();
         checkCameraSettingsNotNull(css);
 
+        const std::string manufacturer = css->GetManufacturer();
+        const std::string model = css->GetModel();
         const std::string serial_nb = String::str("%d", css->GetCameraSerialNumber());
         const std::string fw_str = String::str("%d-%d", css->GetFWMajorVersion(), css->GetFWMinorVersion());
         const std::string sw_str = String::str("%d-%d", css->GetSWMajorVersion(), css->GetSWMinorVersion());
@@ -331,47 +440,56 @@ namespace Sensors
         const std::string ffc_str = toStr(css->GetFFCMode());
         const std::string xpbusmode_str = toStr(css->GetXPBusMode());
         const std::string dod_str = toStr(css->GetCMOSBitDepth());
-        const std::string palette_str = toStr(css->GetPalette());
-        const std::string brightness_str = toStr(css->GetBrightness());
-        const std::string agc_str = toStr(css->GetAGCType());
-        const std::string vcm_str = toStr(css->GetVideoColorMode());
-        const std::string invert_hor_str = toStr(css->GetInvertVideo());
-        const std::string invert_ver_str = toStr(css->GetRevertVideo());
+        const std::string emissivity_str = String::str("%.2f", css->GetEmissivity());
+        const std::string humidity_str = String::str("%.2f", css->GetHumidity());
+        const std::string atmospheric_temp_str = String::str("%.2f", css->GetAtmospericTemperatureC());
+        const std::string reflected_temp_str = String::str("%.2f", css->GetReflectedTemperatureC());
 
         auto print_camera_setting = [this](const std::string& name, const std::string value)
         {
-          this->spew(String::str("%-21s %s", name.c_str(), value.c_str()));
+          m_parent->debug("%-21s: %s", name.c_str(), value.c_str());
         };
 
-        spew("======= CAMERA INFORMATION =======");
-        print_camera_setting("Serial Number:", serial_nb);
-        print_camera_setting("Firmware Version:", fw_str);
-        print_camera_setting("Software Version:", sw_str);
-        print_camera_setting("Resolution:", res_str);
-        print_camera_setting("Speed:", speed_str);
-        print_camera_setting("Range Mode:", range_str);
-        print_camera_setting("FFC Mode:", ffc_str);
-        print_camera_setting("XP Bus Mode:", xpbusmode_str);
-        print_camera_setting("Digital Output Depth:", dod_str);
-        print_camera_setting("Palette:", palette_str);
-        print_camera_setting("Brightness:", brightness_str);
-        print_camera_setting("AGC Type:", agc_str);
-        print_camera_setting("Video Color Mode:", vcm_str);
-        print_camera_setting("Invert Image Horiz:", invert_hor_str);
-        print_camera_setting("Invert Image Vert:", invert_ver_str);
-        spew("==================================");
+        m_parent->debug("======= CAMERA INFORMATION =======");
+        print_camera_setting("Manufacturer", manufacturer);
+        print_camera_setting("Model", model);
+        print_camera_setting("Serial Number", serial_nb);
+        print_camera_setting("Firmware Version", fw_str);
+        print_camera_setting("Software Version", sw_str);
+        print_camera_setting("Resolution", res_str);
+        print_camera_setting("Speed", speed_str);
+        print_camera_setting("Range Mode", range_str);
+        print_camera_setting("FFC Mode", ffc_str);
+        print_camera_setting("XP Bus Mode", xpbusmode_str);
+        print_camera_setting("Digital Output Depth", dod_str);
+        print_camera_setting("Emissivity", emissivity_str);
+        print_camera_setting("Humidity", humidity_str);
+        print_camera_setting("Atmospheric Temp", atmospheric_temp_str);
+        print_camera_setting("Reflected Temp", reflected_temp_str);
+        m_parent->debug("==================================");
       }
 
     private:
       bool
-      findCamera(const std::string& camera_license_file_folder)
+      findCamera(const std::string& camera_license_file_dir)
       {
-        CameraCenter *cameras = new CameraCenter(camera_license_file_folder);
-        if (cameras->getCameras().empty())
+        deallocate();
+        m_camera_center = new CameraCenter(camera_license_file_dir);
+        if (m_camera_center->getCameras().empty())
           return false;
 
-        m_camera = cameras->getCameras().front();
+        // We always get the first camera in the list, assuming it is our camera.
+        // This works in our system because we only have 1 camera connected.
+        // Maybe this logic could be improved by checking the camera type/model/... before assigning to m_camera?
+        m_camera = m_camera_center->getCameras().front();
         return true;
+      }
+
+      void
+      deallocate()
+      {
+        if (m_camera_center)
+          delete m_camera_center;
       }
 
       void
@@ -383,13 +501,15 @@ namespace Sensors
 
       template <typename T>
       bool
-      updateSetting(const std::string& name, const T value, T* current_value,
+      updateSetting(const std::string& name,
+                    const T value,
+                    T& current_value,
                     std::function<void(T)> setter,
                     std::function<T(void)> getter)
       {
-        if (value == *current_value)
+        if (value == current_value)
         {
-          spew(String::str("camera setting '%s' already set to '%s' - ignoring", name.c_str(), toStr(value).c_str()));
+          m_parent->debug("camera setting '%s' already set to '%s' - ignoring", name.c_str(), toStr(value).c_str());
           return true;
         }
 
@@ -398,7 +518,7 @@ namespace Sensors
         if (getter() != value)
           return false;
 
-        *current_value = value;
+        current_value = value;
         return true;
       }
 
@@ -408,15 +528,12 @@ namespace Sensors
         m_error.clear();
       }
 
-      void
-      spew(const std::string& msg)
-      {
-        m_parent->spew("[%-8s] %s", "Camera", msg.c_str());
-      }
-
+      CameraCenter* m_camera_center;
       Camera* m_camera;
       CameraSettings m_settings;
       std::string m_error;
+      double m_temp_conversion_slope;
+      double m_temp_conversion_offset;
       bool m_has_data;
       Task* m_parent;
     };
