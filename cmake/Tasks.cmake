@@ -163,7 +163,6 @@ macro(dune_add_tasks root_folder)
              "Transports/Announce/Task.cmake"
              "Transports/Discovery/Task.cmake"
              "Transports/Logging/Task.cmake"
-             "Transports/SimpleProxy/Task.cmake"
              "Transports/TCP/Client/Task.cmake"
              "Transports/HTTP/Task.cmake"
              "Transports/UDP/Task.cmake"
